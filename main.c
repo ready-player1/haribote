@@ -119,7 +119,7 @@ enum keyId {
   Minus,
   Period,
   Semicolon,
-  Assigne,
+  Assign,
 
   Zero,
   One,
