@@ -123,7 +123,7 @@ int run(String sourceCode)
   int minus     = getTokenCode("-", 1);
   int period    = getTokenCode(".", 1);
   int semicolon = getTokenCode(";", 1);
-  int assigne   = getTokenCode("=", 1);
+  int assign    = getTokenCode("=", 1);
   int print     = getTokenCode("print", 5);
   int _if       = getTokenCode("if", 2);
   int _goto     = getTokenCode("goto", 4);
@@ -139,11 +139,11 @@ int run(String sourceCode)
       vars[tc[pc]] = pc + 2; // ラベル定義命令の次のpc値を変数に記憶させておく
   }
   for (pc = 0; pc < nTokens;) {
-    if (tc[pc + 1] == assigne && tc[pc + 3] == semicolon)
+    if (tc[pc + 1] == assign && tc[pc + 3] == semicolon)
       vars[tc[pc]] = vars[tc[pc + 2]];
-    else if (tc[pc + 1] == assigne && tc[pc + 3] == plus && tc[pc + 5] == semicolon)
+    else if (tc[pc + 1] == assign && tc[pc + 3] == plus && tc[pc + 5] == semicolon)
       vars[tc[pc]] = vars[tc[pc + 2]] + vars[tc[pc + 4]];
-    else if (tc[pc + 1] == assigne && tc[pc + 3] == minus && tc[pc + 5] == semicolon)
+    else if (tc[pc + 1] == assign && tc[pc + 3] == minus && tc[pc + 5] == semicolon)
       vars[tc[pc]] = vars[tc[pc + 2]] - vars[tc[pc + 4]];
     else if (tc[pc] == print && tc[pc + 2] == semicolon)
       printf("%d\n", vars[tc[pc + 1]]);
