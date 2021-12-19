@@ -141,7 +141,7 @@ enum keyId {
   Period,
   Comma,
   Semicolon,
-  Assigne,
+  Assign,
   BitwiseAnd,
 
   Zero,
@@ -355,7 +355,7 @@ void initCorrespondingTerms() {
   correspondingTerms[Equal]      = OpCeq;
   correspondingTerms[NotEq]      = OpCne;
   correspondingTerms[BitwiseAnd] = OpBand;
-  correspondingTerms[Assigne]    = OpCpy;
+  correspondingTerms[Assign]     = OpCpy;
 };
 
 int getOpcode(int tokenCode) // for infix operators
@@ -441,7 +441,7 @@ Precedence precedenceTable[2][ N_OPERATORS + 1 ] = {
     {Equal, 8},
     {NotEq, 8},
     {BitwiseAnd, 9},
-    {Assigne, 15},
+    {Assign, 15},
     {.level = LOWEST_PRECEDENCE + 1}
   }
 };
@@ -537,7 +537,7 @@ int evalExpression(int precedenceLevel)
         er = evalInfixExpression(er, encountered - 1, getOpcode(tokenCode));
         break;
       // 右結合
-      case Assigne:
+      case Assign:
         ++epc;
         e0 = evalExpression(encountered);
         putIc(OpCpy, &vars[er], &vars[e0], 0, 0);
