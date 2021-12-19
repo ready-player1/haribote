@@ -156,7 +156,7 @@ enum keyId {
   ShiftRight,
   And,
 
-  Assigne,
+  Assign,
 
   Lparen,
   Rparen,
@@ -403,7 +403,7 @@ void initCorrespondingTerms() {
   correspondingTerms[NotEq]      = OpCne;
   correspondingTerms[BitwiseAnd] = OpBand;
   correspondingTerms[And]        = OpAnd;
-  correspondingTerms[Assigne]    = OpCpy;
+  correspondingTerms[Assign]     = OpCpy;
 };
 
 int getOpcode(int tokenCode) // for infix operators
@@ -490,7 +490,7 @@ Precedence precedenceTable[2][ N_OPERATORS + 1 ] = {
     {NotEq, 8},
     {BitwiseAnd, 9},
     {And, 12},
-    {Assigne, 15},
+    {Assign, 15},
     {.level = LOWEST_PRECEDENCE + 1}
   }
 };
@@ -573,7 +573,7 @@ int evalExpression(int precedenceLevel)
       e1 = er;
       e0 = expression(0);
       epc = nextPc;
-      if (tokenCodes[epc] == Assigne && (precedenceLevel >= (encountered = getPrecedenceLevel(Infix, Assigne)))) {
+      if (tokenCodes[epc] == Assign && (precedenceLevel >= (encountered = getPrecedenceLevel(Infix, Assign)))) {
         op = OpArySet;
         ++epc;
         er = evalExpression(encountered);
@@ -604,7 +604,7 @@ int evalExpression(int precedenceLevel)
         er = evalInfixExpression(er, encountered - 1, getOpcode(tokenCode));
         break;
       // 右結合
-      case Assigne:
+      case Assign:
         ++epc;
         e0 = evalExpression(encountered);
         putIc(OpCpy, &vars[er], &vars[e0], 0, 0);
@@ -723,7 +723,7 @@ int compile(String sourceCode)
     else if (match(9, "!!*0 = !!*1 + 1;", pc) && tc[wpc[0]] == tc[wpc[1]]) { // +1専用の命令
       putIc(OpAdd1, &vars[tc[wpc[0]]], 0, 0, 0);
     }
-    else if (match(2, "!!*0 = !!*1 !!*2 !!*3;", pc) && Equal <= tc[wpc[2]] && tc[wpc[2]] < Assigne) { // 加算、減算など
+    else if (match(2, "!!*0 = !!*1 !!*2 !!*3;", pc) && Equal <= tc[wpc[2]] && tc[wpc[2]] < Assign) { // 加算、減算など
       putIc(OpCeq + tc[wpc[2]] - Equal, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[3]]], 0);
     }
     else if (match(4, "print !!**0;", pc)) {
