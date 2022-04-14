@@ -879,6 +879,7 @@ int compile(String sourceCode)
     return -1;
   }
   putIc(OpEnd, 0, 0, 0, 0);
+
   IntPtr *end = icp, *tmpDest;
   int op;
   for (icp = internalCodes; icp < end; icp += 5) { // goto先の設定
