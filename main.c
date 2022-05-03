@@ -384,9 +384,7 @@ int run(String sourceCode)
 int main(int argc, const char **argv)
 {
   unsigned char text[10000]; // ソースコード
-
   initTokenCodes(defaultTokens, sizeof defaultTokens / sizeof defaultTokens[0]);
-
   if (argc >= 2) {
     if (loadText((String) argv[1], text, 10000) != 0)
       exit(1);
@@ -394,17 +392,15 @@ int main(int argc, const char **argv)
     exit(0);
   }
 
-  int inputLen;
-  int hasRemovedSemicolon;
-  char *semicolonPos;
-  for (int i = 0;; ++i) { // Read-Eval-Print Loop
-    printf("[%d]> ", i);
+  for (int nLines = 1;; ++nLines) { // Read-Eval-Print Loop
+    printf("[%d]> ", nLines);
     fgets(text, 10000, stdin);
-    inputLen = strlen(text);
+    int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n') // chomp
       text[inputLen - 1] = 0;
 
-    hasRemovedSemicolon = 0;
+    int hasRemovedSemicolon = 0;
+    char *semicolonPos;
     for (int i = strlen(text) - 1; i >= 0; --i) {
       if (text[i] == ';') {
         text[i] = 0;
