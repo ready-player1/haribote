@@ -63,6 +63,49 @@ int getTokenCode(String str, int len)
   return i;
 }
 
+inline static int isAlphabet(unsigned char ch)
+{
+  return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_';
+}
+
+inline static int isNumber(unsigned char ch)
+{
+  return '0' <= ch && ch <= '9';
+}
+
+int lexer(String str, int *tc)
+{
+  int pos = 0, nTokens = 0; // 現在読んでいる位置, これまでに変換したトークンの数
+  int len;
+  for (;;) {
+    while (str[pos] == ' ' || str[pos] == '\t' || str[pos] == '\n' || str[pos] == '\r')
+      ++pos;
+    if (str[pos] == 0)
+      return nTokens;
+
+    len = 0;
+    if (strchr("(){}[];,", str[pos]) != NULL)
+      len = 1;
+    else if (isAlphabet(str[pos]) || isNumber(str[pos])) {
+      while (isAlphabet(str[pos + len]) || isNumber(str[pos + len]))
+        ++len;
+    }
+    else if (strchr("=+-*/!%&~|<>?:.#", str[pos]) != NULL) {
+      while (strchr("=+-*/!%&~|<>?:.#", str[pos + len]) != NULL && str[pos + len] != 0)
+        ++len;
+    }
+    else {
+      printf("Lexing error: %.10s\n", &str[pos]);
+      exit(1);
+    }
+    tc[nTokens] = getTokenCode(&str[pos], len);
+    pos += len;
+    ++nTokens;
+  }
+}
+
+int tc[10000]; // トークンコードを格納する
+
 int main(int argc, const char **argv)
 {
   unsigned char text[10000];
@@ -74,6 +117,9 @@ int main(int argc, const char **argv)
   int semicolon = getTokenCode(";", 1);
   int assign    = getTokenCode("=", 1);
   int print     = getTokenCode("print", 5);
+
+  int nTokens = lexer(text, tc);
+  tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
 
   int vars[256];
   for (int i = 0; i < 10; ++i)
