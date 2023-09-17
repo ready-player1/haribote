@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 typedef unsigned char *String;
 
@@ -117,6 +118,7 @@ int main(int argc, const char **argv)
   int semicolon = getTokenCode(";", 1);
   int assign    = getTokenCode("=", 1);
   int print     = getTokenCode("print", 5);
+  int time      = getTokenCode("time", 4);
 
   int nTokens = lexer(text, tc);
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
@@ -131,6 +133,8 @@ int main(int argc, const char **argv)
       vars[tc[pc]] = vars[tc[pc + 2]] - vars[tc[pc + 4]];
     else if (tc[pc] == print && tc[pc + 2] == semicolon)
       printf("%d\n", vars[tc[pc + 1]]);
+    else if (tc[pc] == time && tc[pc + 1] == semicolon)
+      printf("time: %.3f[sec]\n", clock() / (double) CLOCKS_PER_SEC);
     else
       goto err;
 
