@@ -112,6 +112,14 @@ int main(int argc, const char **argv)
   unsigned char text[10000];
   loadText(argc, argv, text, 10000);
 
+  int equal     = getTokenCode("==", 2);
+  int notEq     = getTokenCode("!=", 2);
+  int lesEq     = getTokenCode("<=", 2);
+  int gtrEq     = getTokenCode(">=", 2);
+  int les       = getTokenCode("<", 1);
+  int gtr       = getTokenCode(">", 1);
+  int lparen    = getTokenCode("(", 1);
+  int rparen    = getTokenCode(")", 1);
   int plus      = getTokenCode("+", 1);
   int minus     = getTokenCode("-", 1);
   int period    = getTokenCode(".", 1);
@@ -121,6 +129,7 @@ int main(int argc, const char **argv)
   int print     = getTokenCode("print", 5);
   int time      = getTokenCode("time", 4);
   int _goto     = getTokenCode("goto", 4);
+  int _if       = getTokenCode("if", 2);
 
   int nTokens = lexer(text, tc);
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
@@ -146,6 +155,16 @@ int main(int argc, const char **argv)
     else if (tc[pc] == _goto && tc[pc + 2] == semicolon) {
       pc = vars[tc[pc + 1]];
       continue;
+    }
+    else if (tc[pc] == _if && tc[pc + 1] == lparen && tc[pc + 5] == rparen && tc[pc + 6] == _goto && tc[pc + 8] == semicolon) {
+      int lhs = vars[tc[pc + 2]], op = tc[pc + 3], rhs = vars[tc[pc + 4]];
+      int dest = vars[tc[pc + 7]];
+      if (op == equal && lhs == rhs) { pc = dest; continue; }
+      if (op == notEq && lhs != rhs) { pc = dest; continue; }
+      if (op == lesEq && lhs <= rhs) { pc = dest; continue; }
+      if (op == gtrEq && lhs >= rhs) { pc = dest; continue; }
+      if (op == les   && lhs <  rhs) { pc = dest; continue; }
+      if (op == gtr   && lhs >  rhs) { pc = dest; continue; }
     }
     else if (tc[pc] == time && tc[pc + 1] == semicolon)
       printf("time: %.3f[sec]\n", clock() / (double) CLOCKS_PER_SEC);
