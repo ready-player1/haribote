@@ -1,3 +1,11 @@
+/*
+  Copyright (c) 2023 Masahiro Oono
+
+  This software is a translator for HL.
+  HL (Haribote Language) is a programming language
+  designed in 2021 by Hidemi Kawai.
+  https://essen.osask.jp/?a21_txt01
+*/
 #include <stdio.h>
 #include <stdlib.h>
 
