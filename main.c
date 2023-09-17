@@ -9,17 +9,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-unsigned char text[] =
-/* BEGIN */
-"a=1;"
-"b=2;"
-"c=a+b;"
-"print c;"
-/* END */
-;
+typedef unsigned char *String;
+
+void loadText(int argc, const char **argv, String text, int size)
+{
+  if (argc < 2) {
+    printf("Usage: %s program-file\n", argv[0]);
+    exit(1);
+  }
+
+  FILE *fp = fopen(argv[1], "rt");
+  if (fp == NULL) {
+    printf("Failed to open %s\n", argv[1]);
+    exit(1);
+  }
+
+  int nItems = fread(text, 1, size - 1, fp);
+  fclose(fp);
+  text[nItems] = 0;
+}
 
 int main(int argc, const char **argv)
 {
+  unsigned char text[10000];
+  loadText(argc, argv, text, 10000);
+
   int vars[256];
   for (int i = 0; i < 10; ++i)
     vars['0' + i] = i;
