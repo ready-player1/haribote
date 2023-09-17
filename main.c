@@ -8,6 +8,7 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef unsigned char *String;
 
@@ -29,10 +30,50 @@ void loadText(int argc, const char **argv, String text, int size)
   text[nItems] = 0;
 }
 
+#define MAX_TOKEN_CODE 1000 // トークンコードの最大値
+String tokenStrs[MAX_TOKEN_CODE + 1];
+int    tokenLens[MAX_TOKEN_CODE + 1];
+
+int vars[MAX_TOKEN_CODE + 1];
+
+int getTokenCode(String str, int len)
+{
+  static unsigned char tokenBuf[(MAX_TOKEN_CODE + 1) * 10];
+  static int nTokens = 0, unusedHead = 0; // 登録済みのトークンの数, 未使用領域へのポインタ
+
+  int i;
+  for (i = 0; i < nTokens; ++i) { // 登録済みのトークンコードの中から探す
+    if (len == tokenLens[i] && strncmp(str, tokenStrs[i], len) == 0)
+      break;
+  }
+  if (i == nTokens) {
+    if (nTokens >= MAX_TOKEN_CODE) {
+      printf("Too many tokens\n");
+      exit(1);
+    }
+    strncpy(&tokenBuf[ unusedHead ], str, len); // 見つからなければ新規登録
+    tokenBuf[ unusedHead + len ] = 0;
+    tokenStrs[i] = &tokenBuf[ unusedHead ];
+    tokenLens[i] = len;
+    unusedHead += len + 1;
+    ++nTokens;
+
+    vars[i] = strtol(tokenStrs[i], NULL, 0); // 定数であれば初期値を設定（定数でなければ0になる）
+  }
+  return i;
+}
+
 int main(int argc, const char **argv)
 {
   unsigned char text[10000];
   loadText(argc, argv, text, 10000);
+
+  int plus      = getTokenCode("+", 1);
+  int minus     = getTokenCode("-", 1);
+  int period    = getTokenCode(".", 1);
+  int semicolon = getTokenCode(";", 1);
+  int assign    = getTokenCode("=", 1);
+  int print     = getTokenCode("print", 5);
 
   int vars[256];
   for (int i = 0; i < 10; ++i)
