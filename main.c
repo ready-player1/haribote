@@ -121,31 +121,24 @@ int main(int argc, const char **argv)
   int nTokens = lexer(text, tc);
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
 
-  int vars[256];
-  for (int i = 0; i < 10; ++i)
-    vars['0' + i] = i;
-
   int pc;
-  for (pc = 0; text[pc] != 0; ++pc) {
-    if (text[pc] == '\n' || text[pc] == '\r' || text[pc] == ' ' || text[pc] == '\t' || text[pc] == ';')
-      continue;
-
-    if (text[pc + 1] == '=' && text[pc + 3] == ';')
-      vars[text[pc]] = vars[text[pc + 2]];
-    else if (text[pc + 1] == '=' && text[pc + 3] == '+' && text[pc + 5] == ';')
-      vars[text[pc]] = vars[text[pc + 2]] + vars[text[pc + 4]];
-    else if (text[pc + 1] == '=' && text[pc + 3] == '-' && text[pc + 5] == ';')
-      vars[text[pc]] = vars[text[pc + 2]] - vars[text[pc + 4]];
-    else if (text[pc] == 'p' && text[pc + 1] == 'r' && text[pc + 5] == ' ' && text[pc + 7] == ';')
-      printf("%d\n", vars[text[pc + 6]]);
+  for (pc = 0; pc < nTokens; ++pc) {
+    if (tc[pc + 1] == assign && tc[pc + 3] == semicolon)
+      vars[tc[pc]] = vars[tc[pc + 2]];
+    else if (tc[pc + 1] == assign && tc[pc + 3] == plus && tc[pc + 5] == semicolon)
+      vars[tc[pc]] = vars[tc[pc + 2]] + vars[tc[pc + 4]];
+    else if (tc[pc + 1] == assign && tc[pc + 3] == minus && tc[pc + 5] == semicolon)
+      vars[tc[pc]] = vars[tc[pc + 2]] - vars[tc[pc + 4]];
+    else if (tc[pc] == print && tc[pc + 2] == semicolon)
+      printf("%d\n", vars[tc[pc + 1]]);
     else
       goto err;
 
-    while (text[pc] != ';')
+    while (tc[pc] != semicolon)
       ++pc;
   }
   exit(0);
 err:
-  printf("Syntax error: %.10s\n", &text[pc]);
+  printf("Syntax error: %s %s %s %s\n", tokenStrs[tc[pc]], tokenStrs[tc[pc + 1]], tokenStrs[tc[pc + 2]], tokenStrs[tc[pc + 3]]);
   exit(1);
 }
