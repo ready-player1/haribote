@@ -189,6 +189,16 @@ err:
   return 1;
 }
 
+String removeTrailingSemicolon(String str, size_t len) {
+  for (int i = len - 1; i >= 0; --i) {
+    if (str[i] != ';')
+      continue;
+    str[i] = 0;
+    return &str[i];
+  }
+  return NULL;
+}
+
 int main(int argc, const char **argv)
 {
   unsigned char text[10000];
@@ -206,6 +216,7 @@ int main(int argc, const char **argv)
     if (text[inputLen - 1] == '\n')
       text[inputLen - 1] = 0;
 
+    String semicolonPos = removeTrailingSemicolon(text, inputLen - 1);
     if (strcmp(text, "exit") == 0)
       exit(0);
     else if (strncmp(text, "run ", 4) == 0) {
@@ -214,6 +225,8 @@ int main(int argc, const char **argv)
       run(text);
     }
     else {
+      if (semicolonPos)
+        *semicolonPos = ';';
       run(text);
     }
   }
