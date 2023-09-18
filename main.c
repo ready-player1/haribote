@@ -137,6 +137,7 @@ int run(String src)
   int _if       = getTokenCode("if", 2);
 
   int nTokens = lexer(src, tc);
+  tc[nTokens++] = semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
 
   int pc;
@@ -173,6 +174,8 @@ int run(String src)
     }
     else if (tc[pc] == time && tc[pc + 1] == semicolon)
       printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
+    else if (tc[pc] == semicolon)
+      ;
     else
       goto err;
 
