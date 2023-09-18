@@ -115,6 +115,8 @@ int tc[10000]; // トークンコードを格納する
 
 int run(String src)
 {
+  clock_t begin = clock();
+
   int equal     = getTokenCode("==", 2);
   int notEq     = getTokenCode("!=", 2);
   int lesEq     = getTokenCode("<=", 2);
@@ -170,7 +172,7 @@ int run(String src)
       if (op == gtr   && lhs >  rhs) { pc = dest; continue; }
     }
     else if (tc[pc] == time && tc[pc + 1] == semicolon)
-      printf("time: %.3f[sec]\n", clock() / (double) CLOCKS_PER_SEC);
+      printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
     else
       goto err;
 
@@ -186,14 +188,30 @@ err:
 
 int main(int argc, const char **argv)
 {
-  if (argc < 2) {
-    printf("Usage: %s program-file\n", argv[0]);
-    exit(1);
+  unsigned char text[10000];
+  if (argc >= 2) {
+    if (loadText((String) argv[1], text, 10000) != 0)
+      exit(1);
+    run(text);
+    exit(0);
   }
 
-  unsigned char text[10000];
-  if (loadText((String) argv[1], text, 10000) != 0)
-    exit(1);
-  run(text);
-  exit(0);
+  for (int nLines = 1;; ++nLines) {
+    printf("[%d]> ", nLines);
+    fgets(text, 10000, stdin);
+    int inputLen = strlen(text);
+    if (text[inputLen - 1] == '\n')
+      text[inputLen - 1] = 0;
+
+    if (strcmp(text, "exit") == 0)
+      exit(0);
+    else if (strncmp(text, "run ", 4) == 0) {
+      if (loadText(&text[4], text, 10000) != 0)
+        continue;
+      run(text);
+    }
+    else {
+      run(text);
+    }
+  }
 }
