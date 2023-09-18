@@ -113,17 +113,8 @@ int lexer(String str, int *tc)
 
 int tc[10000]; // トークンコードを格納する
 
-int main(int argc, const char **argv)
+int run(String src)
 {
-  if (argc < 2) {
-    printf("Usage: %s program-file\n", argv[0]);
-    exit(1);
-  }
-
-  unsigned char text[10000];
-  if (loadText((String) argv[1], text, 10000) != 0)
-    exit(1);
-
   int equal     = getTokenCode("==", 2);
   int notEq     = getTokenCode("!=", 2);
   int lesEq     = getTokenCode("<=", 2);
@@ -143,7 +134,7 @@ int main(int argc, const char **argv)
   int _goto     = getTokenCode("goto", 4);
   int _if       = getTokenCode("if", 2);
 
-  int nTokens = lexer(text, tc);
+  int nTokens = lexer(src, tc);
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
 
   int pc;
@@ -187,8 +178,22 @@ int main(int argc, const char **argv)
       ++pc;
     ++pc; // セミコロンを読み飛ばす
   }
-  exit(0);
+  return 0;
 err:
   printf("Syntax error: %s %s %s %s\n", tokenStrs[tc[pc]], tokenStrs[tc[pc + 1]], tokenStrs[tc[pc + 2]], tokenStrs[tc[pc + 3]]);
-  exit(1);
+  return 1;
+}
+
+int main(int argc, const char **argv)
+{
+  if (argc < 2) {
+    printf("Usage: %s program-file\n", argv[0]);
+    exit(1);
+  }
+
+  unsigned char text[10000];
+  if (loadText((String) argv[1], text, 10000) != 0)
+    exit(1);
+  run(text);
+  exit(0);
 }
