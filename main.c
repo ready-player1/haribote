@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 
 typedef unsigned char *String;
 
@@ -201,6 +202,27 @@ String removeTrailingSemicolon(String str, size_t len)
   return rv;
 }
 
+#include <unistd.h>
+#include <termios.h>
+
+char *readLine(char *str, int size, FILE *stream)
+{
+  assert(size > 0);
+
+  int i, ch, end = size - 1;
+  for (i = 0; (i < end) && ((ch = fgetc(stream)) != EOF); ++i) {
+    if (ch == '\n') {
+      str[i] = '\n'; str[i + 1] = 0;
+      return str;
+    }
+    else {
+      str[i] = ch;
+    }
+  }
+  str[i] = 0;
+  return NULL;
+}
+
 int main(int argc, const char **argv)
 {
   unsigned char text[10000];
@@ -213,7 +235,7 @@ int main(int argc, const char **argv)
 
   for (int nLines = 1;; ++nLines) {
     printf("[%d]> ", nLines);
-    fgets(text, 10000, stdin);
+    readLine(text, 10000, stdin);
     int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n')
       text[inputLen - 1] = 0;
