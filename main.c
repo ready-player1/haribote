@@ -207,17 +207,43 @@ char *readLine(char *str, int size, FILE *stream)
 {
   assert(size > 0);
 
-  int i, ch, end = size - 1;
-  for (i = 0; (i < end) && ((ch = fgetc(stream)) != EOF); ++i) {
+  struct termios initial_term, new_term;
+  tcgetattr(0, &initial_term);
+  new_term = initial_term;
+  new_term.c_oflag |= ONOCR;
+  new_term.c_lflag &= ~(ICANON | ECHO);
+  new_term.c_cc[VMIN] = 1;
+  new_term.c_cc[VTIME] = 0;
+  tcsetattr(0, TCSANOW, &new_term);
+
+  int i = 0, end = size - 1, ch, cursorX = 0;
+  while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
     if (ch == '\n') {
-      str[i] = '\n'; str[i + 1] = 0;
+      putchar(ch);
+      str[i] = ch; str[i + 1] = 0;
+      tcsetattr(0, TCSANOW, &initial_term);
       return str;
     }
+    else if (ch == 8 || ch == 127) { // Backspace or Delete
+      if (cursorX == 0)
+        continue;
+      write(0, "\e[D\e[K", 6);
+      --i;
+      str[i] = 0;
+      --cursorX;
+    }
+    else if (ch < 32) {
+      ;
+    }
     else {
+      putchar(ch);
       str[i] = ch;
+      ++cursorX;
+      ++i;
     }
   }
   str[i] = 0;
+  tcsetattr(0, TCSANOW, &initial_term);
   return NULL;
 }
 
