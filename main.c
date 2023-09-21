@@ -234,6 +234,23 @@ char *readLine(char *str, int size, FILE *stream)
       str[i] = 0;
       --cursorX;
     }
+    else if (ch == 27) { // escape sequence
+      if ((ch = fgetc(stream)) == EOF)
+        break;
+      else if (ch != 91) {
+        ungetc(ch, stream);
+        continue;
+      }
+      if ((ch = fgetc(stream)) == EOF)
+        break;
+      switch (ch) {
+      case 67: case 68: continue; // RightArrow LeftArrow
+      case 65: strncpy(str, "prevhist", 9); break; // UpArrow
+      case 66: strncpy(str, "nexthist", 9); break; // DownArrow
+      }
+      tcsetattr(0, TCSANOW, &initial_term);
+      return str;
+    }
     else if (ch < 32) {
       ;
     }
@@ -259,16 +276,28 @@ int main(int argc, const char **argv)
     exit(0);
   }
 
-  for (int nLines = 1;; ++nLines) {
-    printf("[%d]> ", nLines);
+  for (int next = 1, nLines = 0;;) {
+    if (next)
+      printf("[%d]> ", ++nLines);
     readLine(text, 10000, stdin);
     int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n')
       text[inputLen - 1] = 0;
 
+    next = 1;
     String semicolonPos = removeTrailingSemicolon(text, inputLen - 1);
     if (strcmp(text, "exit") == 0)
       exit(0);
+    else if (strcmp(text, "prevhist") == 0) {
+      printf("prev history");
+      next = 0;
+      continue;
+    }
+    else if (strcmp(text, "nexthist") == 0) {
+      printf("next history");
+      next = 0;
+      continue;
+    }
     else if (strncmp(text, "run ", 4) == 0) {
       if (loadText(&text[4], text, 10000) != 0)
         continue;
