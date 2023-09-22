@@ -227,9 +227,39 @@ inline static void setCanonicalMode()
   tcsetattr(0, TCSANOW, &initial_term);
 }
 
+int cursorX;
+
 inline static void eraseLine()
 {
   printf("\e[2K\r");
+  cursorX = 0;
+}
+
+#define HISTORY_SIZE 100
+
+typedef struct { char str[100]; int len; } Command;
+
+typedef struct {
+  Command buf[HISTORY_SIZE];
+} CmdHistory;
+
+CmdHistory cmdHist;
+
+void setHistory(char *cmd, int len)
+{
+  strncpy((char *) &cmdHist.buf[0].str, cmd, len);
+  cmdHist.buf[0].str[len] = 0;
+  cmdHist.buf[0].len = len;
+}
+
+enum { Prev, Next };
+
+void showHistory(int dir, char *buf)
+{
+  Command *cmd = &cmdHist.buf[0];
+  printf("%s", cmd->str);
+  strncpy(buf, cmd->str, cmd->len + 1);
+  cursorX = cmd->len;
 }
 
 char *readLine(char *str, int size, FILE *stream)
@@ -237,11 +267,13 @@ char *readLine(char *str, int size, FILE *stream)
   assert(size > 0);
   setNonCanonicalMode();
 
-  int i = 0, end = size - 1, ch, cursorX = 0;
+  int i = cursorX ? cursorX : 0, end = size - 1, ch;
   while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
     if (ch == '\n') {
       putchar(ch);
       str[i] = ch; str[i + 1] = 0;
+      setHistory(str, i);
+      cursorX = 0;
       setCanonicalMode();
       return str;
     }
@@ -281,6 +313,7 @@ char *readLine(char *str, int size, FILE *stream)
     }
   }
   str[i] = 0;
+  cursorX = 0;
   setCanonicalMode();
   return NULL;
 }
@@ -311,14 +344,14 @@ int main(int argc, const char **argv)
     else if (strcmp(text, "prevhist") == 0) {
       eraseLine();
       printf("[%d]> ", nLines);
-      printf("prev history");
+      showHistory(Prev, text);
       next = 0;
       continue;
     }
     else if (strcmp(text, "nexthist") == 0) {
       eraseLine();
       printf("[%d]> ", nLines);
-      printf("next history");
+      showHistory(Next, text);
       next = 0;
       continue;
     }
