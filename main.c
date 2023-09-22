@@ -203,25 +203,45 @@ String removeTrailingSemicolon(String str, size_t len) {
 #include <unistd.h>
 #include <termios.h>
 
-char *readLine(char *str, int size, FILE *stream)
-{
-  assert(size > 0);
+struct termios initial_term;
 
-  struct termios initial_term, new_term;
+void initTerm()
+{
   tcgetattr(0, &initial_term);
+}
+
+inline static void setNonCanonicalMode()
+{
+  struct termios new_term;
   new_term = initial_term;
   new_term.c_oflag |= ONOCR;
   new_term.c_lflag &= ~(ICANON | ECHO);
   new_term.c_cc[VMIN] = 1;
   new_term.c_cc[VTIME] = 0;
   tcsetattr(0, TCSANOW, &new_term);
+}
+
+inline static void setCanonicalMode()
+{
+  tcsetattr(0, TCSANOW, &initial_term);
+}
+
+inline static void eraseLine()
+{
+  printf("\e[2K\r");
+}
+
+char *readLine(char *str, int size, FILE *stream)
+{
+  assert(size > 0);
+  setNonCanonicalMode();
 
   int i = 0, end = size - 1, ch, cursorX = 0;
   while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
     if (ch == '\n') {
       putchar(ch);
       str[i] = ch; str[i + 1] = 0;
-      tcsetattr(0, TCSANOW, &initial_term);
+      setCanonicalMode();
       return str;
     }
     else if (ch == 8 || ch == 127) { // Backspace or Delete
@@ -246,7 +266,7 @@ char *readLine(char *str, int size, FILE *stream)
       case 65: strncpy(str, "prevhist", 9); break; // UpArrow
       case 66: strncpy(str, "nexthist", 9); break; // DownArrow
       }
-      tcsetattr(0, TCSANOW, &initial_term);
+      setCanonicalMode();
       return str;
     }
     else if (ch < 32) {
@@ -260,7 +280,7 @@ char *readLine(char *str, int size, FILE *stream)
     }
   }
   str[i] = 0;
-  tcsetattr(0, TCSANOW, &initial_term);
+  setCanonicalMode();
   return NULL;
 }
 
@@ -274,6 +294,7 @@ int main(int argc, const char **argv)
     exit(0);
   }
 
+  initTerm();
   for (int next = 1, nLines = 0;;) {
     if (next)
       printf("[%d]> ", ++nLines);
@@ -287,11 +308,15 @@ int main(int argc, const char **argv)
     if (strcmp(text, "exit") == 0)
       exit(0);
     else if (strcmp(text, "prevhist") == 0) {
+      eraseLine();
+      printf("[%d]> ", nLines);
       printf("prev history");
       next = 0;
       continue;
     }
     else if (strcmp(text, "nexthist") == 0) {
+      eraseLine();
+      printf("[%d]> ", nLines);
       printf("next history");
       next = 0;
       continue;
