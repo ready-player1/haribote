@@ -240,22 +240,46 @@ typedef struct { char str[100]; int len; } Command;
 
 typedef struct {
   Command buf[HISTORY_SIZE];
+  int head, tail, count, pos;
 } CmdHistory;
 
 CmdHistory cmdHist;
 
 void setHistory(char *cmd, int len)
 {
-  strncpy((char *) &cmdHist.buf[0].str, cmd, len);
-  cmdHist.buf[0].str[len] = 0;
-  cmdHist.buf[0].len = len;
+  if (len == 0)
+    return;
+
+  strncpy((char *) &cmdHist.buf[cmdHist.tail].str, cmd, len);
+  cmdHist.buf[cmdHist.tail].str[len] = 0;
+  cmdHist.buf[cmdHist.tail].len = len;
+  if (cmdHist.count < HISTORY_SIZE)
+    ++cmdHist.count;
+  else
+    cmdHist.head = (cmdHist.head + 1) % HISTORY_SIZE;
+  cmdHist.tail = (cmdHist.tail + 1) % HISTORY_SIZE;
 }
 
 enum { Prev, Next };
 
 void showHistory(int dir, char *buf)
 {
-  Command *cmd = &cmdHist.buf[0];
+  if (cmdHist.count == 0)
+    return;
+
+  if (dir == Prev && cmdHist.pos < cmdHist.count)
+    ++cmdHist.pos;
+  else if (dir == Prev && cmdHist.pos >= cmdHist.count)
+    cmdHist.pos = cmdHist.count;
+  else if (dir == Next && cmdHist.pos > 1)
+    --cmdHist.pos;
+  else if (dir == Next && cmdHist.pos <= 1) {
+    cmdHist.pos = 0;
+    return;
+  }
+
+  int i = (cmdHist.head + cmdHist.count - cmdHist.pos) % cmdHist.count;
+  Command *cmd = &cmdHist.buf[i];
   printf("%s", cmd->str);
   strncpy(buf, cmd->str, cmd->len + 1);
   cursorX = cmd->len;
@@ -272,6 +296,7 @@ char *readLine(char *str, int size, FILE *stream)
       putchar(ch);
       str[i] = ch; str[i + 1] = 0;
       setHistory(str, i);
+      cmdHist.pos = 0;
       cursorX = 0;
       setCanonicalMode();
       return str;
