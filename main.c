@@ -11,6 +11,10 @@
 #include <string.h>
 #include <time.h>
 #include <assert.h>
+#if defined(__APPLE__) || defined(__linux__)
+#include <unistd.h>
+#include <termios.h>
+#endif
 
 typedef unsigned char *String;
 
@@ -202,9 +206,7 @@ String removeTrailingSemicolon(String str, size_t len)
   return rv;
 }
 
-#include <unistd.h>
-#include <termios.h>
-
+#if defined(__APPLE__) || defined(__linux__)
 struct termios initial_term;
 
 void loadHistory();
@@ -245,8 +247,13 @@ inline static void eraseLine()
   printf("\e[2K\r");
   cursorX = 0;
 }
+#else
+void initTerm() {}
+void destroyTerm() {}
+#endif
 
 #define LINE_SIZE 100
+#if defined(__APPLE__) || defined(__linux__)
 #define HISTORY_SIZE 100
 
 typedef struct { char str[LINE_SIZE]; int len; } Command;
@@ -386,6 +393,9 @@ char *readLine(char *str, int size, FILE *stream)
   setCanonicalMode();
   return NULL;
 }
+#else
+#define readLine fgets
+#endif
 
 int main(int argc, const char **argv)
 {
@@ -412,6 +422,7 @@ int main(int argc, const char **argv)
       destroyTerm();
       exit(0);
     }
+#if defined(__APPLE__) || defined(__linux__)
     else if (strcmp(text, "__PREV_HIST") == 0) {
       eraseLine();
       printf("[%d]> ", nLines);
@@ -424,6 +435,7 @@ int main(int argc, const char **argv)
       showHistory(Next, text);
       next = 0;
     }
+#endif
     else if (strncmp(text, "run ", 4) == 0) {
       if (loadText(&text[4], text, 10000) != 0)
         continue;
