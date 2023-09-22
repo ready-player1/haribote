@@ -207,9 +207,12 @@ String removeTrailingSemicolon(String str, size_t len)
 
 struct termios initial_term;
 
+void loadHistory();
+
 void initTerm()
 {
   tcgetattr(0, &initial_term);
+  loadHistory();
 }
 
 inline static void setNonCanonicalMode()
@@ -236,9 +239,10 @@ inline static void eraseLine()
   cursorX = 0;
 }
 
+#define LINE_SIZE 100
 #define HISTORY_SIZE 100
 
-typedef struct { char str[100]; int len; } Command;
+typedef struct { char str[LINE_SIZE]; int len; } Command;
 
 typedef struct {
   Command buf[HISTORY_SIZE];
@@ -285,6 +289,22 @@ void showHistory(int dir, char *buf)
   printf("%s", cmd->str);
   strncpy(buf, cmd->str, cmd->len + 1);
   cursorX = cmd->len;
+}
+
+void loadHistory()
+{
+  FILE *fp;
+  if ((fp = fopen(".haribote_history", "rt")) == NULL)
+    return;
+
+  for (int i = 0; i < HISTORY_SIZE; ++i) {
+    char line[LINE_SIZE];
+    if (fgets(line, LINE_SIZE, fp) == NULL)
+      break;
+    setHistory(line, strlen(line) - 1);
+  }
+
+  fclose(fp);
 }
 
 char *readLine(char *str, int size, FILE *stream)
@@ -358,7 +378,7 @@ int main(int argc, const char **argv)
   for (int next = 1, nLines = 0;;) {
     if (next)
       printf("[%d]> ", ++nLines);
-    readLine(text, 10000, stdin);
+    readLine(text, LINE_SIZE, stdin);
     int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n')
       text[inputLen - 1] = 0;
