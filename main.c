@@ -215,6 +215,13 @@ void initTerm()
   loadHistory();
 }
 
+void saveHistory();
+
+void destroyTerm()
+{
+  saveHistory();
+}
+
 inline static void setNonCanonicalMode()
 {
   struct termios new_term;
@@ -289,6 +296,22 @@ void showHistory(int dir, char *buf)
   printf("%s", cmd->str);
   strncpy(buf, cmd->str, cmd->len + 1);
   cursorX = cmd->len;
+}
+
+void saveHistory()
+{
+  FILE *fp;
+  if (cmdHist.count == 0 || (fp = fopen(".haribote_history", "wt")) == NULL)
+    return;
+
+  int counter = cmdHist.count;
+  while (counter > 0) {
+    int i = (cmdHist.head + cmdHist.count - counter) % cmdHist.count;
+    fprintf(fp, "%s\n", cmdHist.buf[i].str);
+    --counter;
+  }
+
+  fclose(fp);
 }
 
 void loadHistory()
@@ -385,8 +408,10 @@ int main(int argc, const char **argv)
 
     next = 1;
     String semicolonPos = removeTrailingSemicolon(text, inputLen - 1);
-    if (strcmp(text, "exit") == 0)
+    if (strcmp(text, "exit") == 0) {
+      destroyTerm();
       exit(0);
+    }
     else if (strcmp(text, "__PREV_HIST") == 0) {
       eraseLine();
       printf("[%d]> ", nLines);
