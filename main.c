@@ -246,6 +246,12 @@ inline static void eraseLine()
   printf("\e[2K\r");
   cursorX = 0;
 }
+
+inline static void eraseAll()
+{
+  printf("\e[2J\e[H");
+  cursorX = 0;
+}
 #else
 void initTerm() {}
 void destroyTerm() {}
@@ -377,6 +383,11 @@ char *readLine(char *str, int size, FILE *stream)
       setCanonicalMode();
       return str;
     }
+    else if (ch == 12) { // Control-L
+      strncpy(str, "clear", 6);
+      setCanonicalMode();
+      return str;
+    }
     else if (ch < 32) {
       ;
     }
@@ -442,6 +453,14 @@ int main(int argc, const char **argv)
         continue;
       run(text);
     }
+#if defined(__APPLE__) || defined(__linux__)
+    else if (strcmp(text, "clear") == 0) {
+      eraseAll();
+      printf("[%d]> ", nLines);
+      next = 0;
+      continue;
+    }
+#endif
     else {
       if (semicolonPos)
         *semicolonPos = ';';
