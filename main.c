@@ -389,6 +389,11 @@ char *readLine(char *str, int size, FILE *stream)
       setCanonicalMode();
       return str;
     }
+    else if (ch == 11) { // Control-K
+      write(0, "\e[K", 3);
+      str[cursorX] = 0;
+      i -= i - cursorX;
+    }
     else if (ch == 12) { // Control-L
       strncpy(str, "clear", 6);
       setCanonicalMode();
