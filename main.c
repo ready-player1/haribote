@@ -391,6 +391,18 @@ char *readLine(char *str, int size, FILE *stream)
       setCanonicalMode();
       return str;
     }
+    else if (ch == 1) { // Control-A
+      if (cursorX <= 0)
+        continue;
+      printf("\e[%dD", cursorX);
+      cursorX = 0;
+    }
+    else if (ch == 5) { // Control-E
+      if (cursorX >= i)
+        continue;
+      printf("\e[%dC", i - cursorX);
+      cursorX = i;
+    }
     else if (ch == 11) { // Control-K
       write(0, "\e[K", 3);
       str[cursorX] = 0;
