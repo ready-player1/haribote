@@ -348,8 +348,27 @@ char *readLine(char *str, int size, FILE *stream)
   assert(size > 0);
   setNonCanonicalMode();
 
-  int i = cursorX ? cursorX : 0, end = size - 1, ch;
+  int i = cursorX ? cursorX : 0, end = size - 1, ch, nDeleted = 0;
   while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
+    if (ch == 8 || ch == 127) { // Backspace or Delete
+      if (cursorX == 0)
+        continue;
+
+      write(0, "\e[D\e[K", 6);
+      if (cursorX < i) {
+        str[i] = 0;
+        printf("\e7%s\e8", &str[cursorX + nDeleted]);
+      }
+      --cursorX;
+      ++nDeleted;
+      continue;
+    }
+    else if (nDeleted > 0) {
+      memmove(&str[cursorX], &str[cursorX + nDeleted], i - cursorX - nDeleted);
+      i -= nDeleted;
+      str[i] = nDeleted = 0;
+    }
+
     if (ch == '\n') {
       putchar(ch);
       str[i] = ch; str[i + 1] = 0;
@@ -358,20 +377,6 @@ char *readLine(char *str, int size, FILE *stream)
       cursorX = 0;
       setCanonicalMode();
       return str;
-    }
-    else if (ch == 8 || ch == 127) { // Backspace or Delete
-      if (cursorX == 0)
-        continue;
-
-      write(0, "\e[D\e[K", 6);
-      if (cursorX < i) {
-        str[i] = 0;
-        printf("\e7%s\e8", &str[cursorX]);
-        memmove(&str[cursorX - 1], &str[cursorX], i - cursorX);
-      }
-      --i;
-      str[i] = 0;
-      --cursorX;
     }
     else if (ch == 27) { // escape sequence
       if ((ch = fgetc(stream)) == EOF)
