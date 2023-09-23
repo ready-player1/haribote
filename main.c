@@ -360,7 +360,13 @@ char *readLine(char *str, int size, FILE *stream)
     else if (ch == 8 || ch == 127) { // Backspace or Delete
       if (cursorX == 0)
         continue;
+
       write(0, "\e[D\e[K", 6);
+      if (cursorX < i) {
+        str[i] = 0;
+        printf("\e7%s\e8", &str[cursorX]);
+        memmove(&str[cursorX - 1], &str[cursorX], i - cursorX);
+      }
       --i;
       str[i] = 0;
       --cursorX;
@@ -375,7 +381,8 @@ char *readLine(char *str, int size, FILE *stream)
       if ((ch = fgetc(stream)) == EOF)
         break;
       switch (ch) {
-      case 67: case 68: continue; // RightArrow LeftArrow
+      case 67: if (cursorX < i) { write(0, "\e[C", 3); ++cursorX; } continue; // RightArrow
+      case 68: if (cursorX > 0) { write(0, "\e[D", 3); --cursorX; } continue; // LeftArrow
       case 65: strncpy(str, "prevhist", 9); break; // UpArrow
       case 66: strncpy(str, "nexthist", 9); break; // DownArrow
       }
@@ -392,7 +399,12 @@ char *readLine(char *str, int size, FILE *stream)
     }
     else {
       putchar(ch);
-      str[i] = ch;
+      if (cursorX < i) {
+        str[i] = 0;
+        printf("\e7%s\e8", &str[cursorX]);
+        memmove(&str[cursorX + 1], &str[cursorX], i - cursorX);
+      }
+      str[cursorX] = ch;
       ++cursorX;
       ++i;
     }
