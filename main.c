@@ -428,6 +428,15 @@ char *readLine(char *str, int size, FILE *stream)
       printf("\e[%dC", i - cursorX);
       cursorX = i;
     }
+    else if (ch == 21) { // Control-U
+      if (cursorX <= 0)
+        continue;
+      str[i] = 0;
+      printf("\e[%dD\e[K\e7%s\e8", cursorX, &str[cursorX]);
+      memmove(str, &str[cursorX], i - cursorX);
+      i -= cursorX;
+      cursorX = 0;
+    }
     else if (ch == 11) { // Control-K
       write(1, "\e[K", 3);
       str[cursorX] = 0;
