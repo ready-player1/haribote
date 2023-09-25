@@ -116,7 +116,47 @@ int lexer(String str, int *tc)
   }
 }
 
-int tc[10000]; // トークンコードを格納する
+int tc[10000]; // トークンコード列を格納する
+
+enum { Wildcard, Zero, One, EndOfKeys };
+String defaultTokens[] = {"!!*", "0", "1"};
+
+void initTc(String *defaultTokens, int len)
+{
+  assert(len == EndOfKeys);
+  for (int i = 0; i < len; ++i)
+    tc[i] = getTokenCode(defaultTokens[i], strlen(defaultTokens[i]));
+}
+
+#define MAX_PHRASE_LEN 31
+int phraseTc[(MAX_PHRASE_LEN + 1) * 100]; // フレーズを字句解析して得たトークンコード列を格納する
+int wpc[2]; // ワイルドカードにマッチしたトークンを指す
+
+int match(int id, String phrase, int pc)
+{
+  int head = id * (MAX_PHRASE_LEN + 1), phraseLen;
+
+  if (phraseTc[head + MAX_PHRASE_LEN] == 0) {
+    phraseLen = lexer(phrase, &phraseTc[head]);
+    assert(phraseLen <= MAX_PHRASE_LEN);
+    phraseTc[head + MAX_PHRASE_LEN] = phraseLen;
+  }
+
+  phraseLen = phraseTc[head + MAX_PHRASE_LEN];
+  for (int pos = 0; pos < phraseLen; ++pos) {
+    if (phraseTc[head + pos] == Wildcard) {
+      ++pos;
+      int num = phraseTc[head + pos] - Zero;
+      wpc[num] = pc;
+      ++pc;
+      continue;
+    }
+    if (phraseTc[head + pos] != tc[pc])
+      return 0;
+    ++pc;
+  }
+  return 1;
+}
 
 int run(String src)
 {
@@ -151,8 +191,9 @@ int run(String src)
       vars[tc[pc]] = pc + 2; // ラベル定義命令の次のpc値を変数に記憶させておく
   }
   for (pc = 0; pc < nTokens;) {
-    if (tc[pc + 1] == assign && tc[pc + 3] == semicolon)
-      vars[tc[pc]] = vars[tc[pc + 2]];
+    if (match(0, "!!*0 = !!*1;", pc)) {
+      vars[tc[wpc[0]]] = vars[tc[wpc[1]]];
+    }
     else if (tc[pc + 1] == assign && tc[pc + 3] == plus && tc[pc + 5] == semicolon)
       vars[tc[pc]] = vars[tc[pc + 2]] + vars[tc[pc + 4]];
     else if (tc[pc + 1] == assign && tc[pc + 3] == minus && tc[pc + 5] == semicolon)
@@ -483,6 +524,7 @@ char *readLine(char *str, int size, FILE *stream)
 int main(int argc, const char **argv)
 {
   unsigned char text[10000];
+  initTc(defaultTokens, sizeof defaultTokens / sizeof defaultTokens[0]);
   if (argc >= 2) {
     if (loadText((String) argv[1], text, 10000) != 0)
       exit(1);
