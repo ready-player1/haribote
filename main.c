@@ -234,50 +234,55 @@ int run(String src)
   clock_t begin = clock();
 
   int nTokens = lexer(src, tc);
-  tc[nTokens++] = semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
-  tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
+  tc[nTokens++] = Semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
+  tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = Period; // エラー表示用
 
   int pc;
   for (pc = 0; pc < nTokens; ++pc) { // ラベル定義命令を探して位置を登録
-    if (tc[pc + 1] == colon)
+    if (match(4, "!!*0:", pc))
       vars[tc[pc]] = pc + 2; // ラベル定義命令の次のpc値を変数に記憶させておく
   }
   for (pc = 0; pc < nTokens;) {
     if (match(0, "!!*0 = !!*1;", pc)) {
       vars[tc[wpc[0]]] = vars[tc[wpc[1]]];
     }
-    else if (tc[pc + 1] == assign && tc[pc + 3] == plus && tc[pc + 5] == semicolon)
-      vars[tc[pc]] = vars[tc[pc + 2]] + vars[tc[pc + 4]];
-    else if (tc[pc + 1] == assign && tc[pc + 3] == minus && tc[pc + 5] == semicolon)
-      vars[tc[pc]] = vars[tc[pc + 2]] - vars[tc[pc + 4]];
-    else if (tc[pc] == print && tc[pc + 2] == semicolon)
-      printf("%d\n", vars[tc[pc + 1]]);
-    else if (tc[pc + 1] == colon) { // ラベル定義命令
+    else if (match(1, "!!*0 = !!*1 + !!*2;", pc)) {
+      vars[tc[wpc[0]]] = vars[tc[wpc[1]]] + vars[tc[wpc[2]]];
+    }
+    else if (match(2, "!!*0 = !!*1 - !!*2;", pc)) {
+      vars[tc[wpc[0]]] = vars[tc[wpc[1]]] - vars[tc[wpc[2]]];
+    }
+    else if (match(3, "print !!*0;", pc)) {
+      printf("%d\n", vars[tc[wpc[0]]]);
+    }
+    else if (match(4, "!!*0:", pc)) { // ラベル定義命令
       pc += 2; // 読み飛ばす
       continue;
     }
-    else if (tc[pc] == _goto && tc[pc + 2] == semicolon) {
-      pc = vars[tc[pc + 1]];
+    else if (match(5, "goto !!*0;", pc)) {
+      pc = vars[tc[wpc[0]]];
       continue;
     }
-    else if (tc[pc] == _if && tc[pc + 1] == lparen && tc[pc + 5] == rparen && tc[pc + 6] == _goto && tc[pc + 8] == semicolon) {
-      int lhs = vars[tc[pc + 2]], op = tc[pc + 3], rhs = vars[tc[pc + 4]];
-      int dest = vars[tc[pc + 7]];
-      if (op == equal && lhs == rhs) { pc = dest; continue; }
-      if (op == notEq && lhs != rhs) { pc = dest; continue; }
-      if (op == lesEq && lhs <= rhs) { pc = dest; continue; }
-      if (op == gtrEq && lhs >= rhs) { pc = dest; continue; }
-      if (op == les   && lhs <  rhs) { pc = dest; continue; }
-      if (op == gtr   && lhs >  rhs) { pc = dest; continue; }
+    else if (match(6, "if (!!*0 !!*1 !!*2) goto !!*3;", pc) && Equal <= tc[wpc[1]] && tc[wpc[1]] <= Gtr) {
+      int lhs = vars[tc[wpc[0]]], op = tc[wpc[1]], rhs = vars[tc[wpc[2]]];
+      int dest = vars[tc[wpc[3]]];
+      if (op == Equal && lhs == rhs) { pc = dest; continue; }
+      if (op == NotEq && lhs != rhs) { pc = dest; continue; }
+      if (op == LesEq && lhs <= rhs) { pc = dest; continue; }
+      if (op == GtrEq && lhs >= rhs) { pc = dest; continue; }
+      if (op == Les   && lhs <  rhs) { pc = dest; continue; }
+      if (op == Gtr   && lhs >  rhs) { pc = dest; continue; }
     }
-    else if (tc[pc] == time && tc[pc + 1] == semicolon)
+    else if (match(7, "time;", pc)) {
       printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
-    else if (tc[pc] == semicolon)
+    }
+    else if (match(8, ";", pc)) {
       ;
-    else
+    }
+    else {
       goto err;
-
-    while (tc[pc] != semicolon)
+    }
+    while (tc[pc] != Semicolon)
       ++pc;
     ++pc; // セミコロンを読み飛ばす
   }
