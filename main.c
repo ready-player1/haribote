@@ -202,6 +202,7 @@ void initTc(String *defaultTokens, int len)
 #define MAX_PHRASE_LEN 31
 int phraseTc[(MAX_PHRASE_LEN + 1) * 100]; // フレーズを字句解析して得たトークンコード列を格納する
 int wpc[10]; // ワイルドカードにマッチしたトークンを指す
+int nextPc; // マッチしたフレーズの末尾の次のトークンを指す
 
 int match(int id, String phrase, int pc)
 {
@@ -226,6 +227,7 @@ int match(int id, String phrase, int pc)
       return 0;
     ++pc;
   }
+  nextPc = pc;
   return 1;
 }
 
@@ -240,7 +242,7 @@ int run(String src)
   int pc;
   for (pc = 0; pc < nTokens; ++pc) { // ラベル定義命令を探して位置を登録
     if (match(4, "!!*0:", pc))
-      vars[tc[pc]] = pc + 2; // ラベル定義命令の次のpc値を変数に記憶させておく
+      vars[tc[pc]] = nextPc; // ラベル定義命令の次のpc値を変数に記憶させておく
   }
   for (pc = 0; pc < nTokens;) {
     if (match(0, "!!*0 = !!*1;", pc)) {
@@ -256,8 +258,7 @@ int run(String src)
       printf("%d\n", vars[tc[wpc[0]]]);
     }
     else if (match(4, "!!*0:", pc)) { // ラベル定義命令
-      pc += 2; // 読み飛ばす
-      continue;
+      ;
     }
     else if (match(5, "goto !!*0;", pc)) {
       pc = vars[tc[wpc[0]]];
@@ -282,9 +283,7 @@ int run(String src)
     else {
       goto err;
     }
-    while (tc[pc] != Semicolon)
-      ++pc;
-    ++pc; // セミコロンを読み飛ばす
+    pc = nextPc;
   }
   return 0;
 err:
