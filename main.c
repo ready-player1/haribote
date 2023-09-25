@@ -118,8 +118,79 @@ int lexer(String str, int *tc)
 
 int tc[10000]; // トークンコード列を格納する
 
-enum { Wildcard, Zero, One, EndOfKeys };
-String defaultTokens[] = {"!!*", "0", "1"};
+enum {
+  Wildcard,
+
+  Zero,
+  One,
+  Two,
+  Three,
+  Four,
+  Five,
+  Six,
+  Seven,
+  Eight,
+  Nine,
+
+  Equal,
+  NotEq,
+  LesEq,
+  GtrEq,
+  Les,
+  Gtr,
+  Plus,
+  Minus,
+  Assign,
+
+  Lparen,
+  Rparen,
+  Period,
+  Semicolon,
+  Colon,
+
+  Print,
+  Time,
+  Goto,
+  If,
+
+  EndOfKeys
+};
+
+String defaultTokens[] = {
+  "!!*",
+
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+
+  "==",
+  "!=",
+  "<=",
+  ">=",
+  "<",
+  ">",
+  "+",
+  "-",
+  "=",
+
+  "(",
+  ")",
+  ".",
+  ";",
+  ":",
+
+  "print",
+  "time",
+  "goto",
+  "if",
+};
 
 void initTc(String *defaultTokens, int len)
 {
@@ -130,7 +201,7 @@ void initTc(String *defaultTokens, int len)
 
 #define MAX_PHRASE_LEN 31
 int phraseTc[(MAX_PHRASE_LEN + 1) * 100]; // フレーズを字句解析して得たトークンコード列を格納する
-int wpc[2]; // ワイルドカードにマッチしたトークンを指す
+int wpc[10]; // ワイルドカードにマッチしたトークンを指す
 
 int match(int id, String phrase, int pc)
 {
@@ -161,25 +232,6 @@ int match(int id, String phrase, int pc)
 int run(String src)
 {
   clock_t begin = clock();
-
-  int equal     = getTokenCode("==", 2);
-  int notEq     = getTokenCode("!=", 2);
-  int lesEq     = getTokenCode("<=", 2);
-  int gtrEq     = getTokenCode(">=", 2);
-  int les       = getTokenCode("<", 1);
-  int gtr       = getTokenCode(">", 1);
-  int lparen    = getTokenCode("(", 1);
-  int rparen    = getTokenCode(")", 1);
-  int plus      = getTokenCode("+", 1);
-  int minus     = getTokenCode("-", 1);
-  int period    = getTokenCode(".", 1);
-  int semicolon = getTokenCode(";", 1);
-  int colon     = getTokenCode(":", 1);
-  int assign    = getTokenCode("=", 1);
-  int print     = getTokenCode("print", 5);
-  int time      = getTokenCode("time", 4);
-  int _goto     = getTokenCode("goto", 4);
-  int _if       = getTokenCode("if", 2);
 
   int nTokens = lexer(src, tc);
   tc[nTokens++] = semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
