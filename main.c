@@ -231,6 +231,37 @@ int match(int id, String phrase, int pc)
   return 1;
 }
 
+typedef int *IntPtr;
+
+IntPtr internalCodes[10000]; // ソースコードをコンパイルして生成した内部コードを格納する
+IntPtr *icp;
+
+typedef enum {
+  OpEnd,
+  OpCpy,
+  OpAdd,
+  OpSub,
+  OpPrint,
+  OpGoto,
+  OpJeq,
+  OpJne,
+  OpJle,
+  OpJge,
+  OpJlt,
+  OpJgt,
+  OpTime,
+} Opcode;
+
+void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
+{
+  icp[0] = (IntPtr) op;
+  icp[1] = p1;
+  icp[2] = p2;
+  icp[3] = p3;
+  icp[4] = p4;
+  icp += 5;
+}
+
 int run(String src)
 {
   clock_t begin = clock();
@@ -289,6 +320,47 @@ int run(String src)
 err:
   printf("Syntax error: %s %s %s %s\n", tokenStrs[tc[pc]], tokenStrs[tc[pc + 1]], tokenStrs[tc[pc + 2]], tokenStrs[tc[pc + 3]]);
   return 1;
+}
+
+void exec()
+{
+  clock_t begin = clock();
+  icp = internalCodes;
+  for (;;) {
+    switch ((Opcode) icp[0]) {
+    case OpEnd:
+      return;
+    case OpCpy:
+      *icp[1] = *icp[2];
+      icp += 5;
+      continue;
+    case OpAdd:
+      *icp[1] = *icp[2] + *icp[3];
+      icp += 5;
+      continue;
+    case OpSub:
+      *icp[1] = *icp[2] - *icp[3];
+      icp += 5;
+      continue;
+    case OpPrint:
+      printf("%d\n", *icp[1]);
+      icp += 5;
+      continue;
+    case OpGoto:
+      icp = (IntPtr *) icp[1];
+      continue;
+    case OpJeq:  if (*icp[2] == *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
+    case OpJne:  if (*icp[2] != *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
+    case OpJle:  if (*icp[2] <= *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
+    case OpJge:  if (*icp[2] >= *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
+    case OpJlt:  if (*icp[2] <  *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
+    case OpJgt:  if (*icp[2] >  *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
+    case OpTime:
+      printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
+      icp += 5;
+      continue;
+    }
+  }
 }
 
 String removeTrailingSemicolon(String str, size_t len)
