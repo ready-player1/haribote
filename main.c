@@ -250,6 +250,7 @@ typedef enum {
   OpJlt,
   OpJgt,
   OpTime,
+  OpAdd1,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -274,6 +275,9 @@ int compile(String src)
   for (pc = 0; pc < nTokens;) {
     if (match(0, "!!*0 = !!*1;", pc)) {
       putIc(OpCpy, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], 0, 0);
+    }
+    else if (match(9, "!!*0 = !!*1 + 1;", pc) && tc[wpc[0]] == tc[wpc[1]]) { // +1専用の命令
+      putIc(OpAdd1, &vars[tc[wpc[0]]], 0, 0, 0);
     }
     else if (match(1, "!!*0 = !!*1 + !!*2;", pc)) {
       putIc(OpAdd, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[2]]], 0);
@@ -354,6 +358,10 @@ void exec()
     case OpJgt:  if (*icp[2] >  *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
     case OpTime:
       printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
+      icp += 5;
+      continue;
+    case OpAdd1:
+      ++(*icp[1]);
       icp += 5;
       continue;
     }
