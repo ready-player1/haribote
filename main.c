@@ -120,6 +120,8 @@ int tc[10000]; // トークンコード列を格納する
 
 enum {
   Wildcard,
+  Expr,
+  Expr0,
 
   Zero,
   One,
@@ -144,7 +146,12 @@ enum {
 
   Lparen,
   Rparen,
+  Lbracket,
+  Rbracket,
+  Lbrace,
+  Rbrace,
   Period,
+  Comma,
   Semicolon,
   Colon,
 
@@ -158,6 +165,8 @@ enum {
 
 String defaultTokens[] = {
   "!!*",
+  "!!**",
+  "!!***",
 
   "0",
   "1",
@@ -182,7 +191,12 @@ String defaultTokens[] = {
 
   "(",
   ")",
+  "[",
+  "]",
+  "{",
+  "}",
   ".",
+  ",",
   ";",
   ":",
 
@@ -200,9 +214,15 @@ void initTc(String *defaultTokens, int len)
 }
 
 #define MAX_PHRASE_LEN 31
+#define N_WILDCARDS 10
 int phraseTc[(MAX_PHRASE_LEN + 1) * 100]; // フレーズを字句解析して得たトークンコード列を格納する
-int wpc[10]; // ワイルドカードにマッチしたトークンを指す
+int wpc[N_WILDCARDS * 2]; // ワイルドカードにマッチしたトークンを指す
 int nextPc; // マッチしたフレーズの末尾の次のトークンを指す
+
+inline static int _end(int num)
+{
+  return N_WILDCARDS + num;
+}
 
 int match(int id, String phrase, int pc)
 {
@@ -216,14 +236,38 @@ int match(int id, String phrase, int pc)
 
   phraseLen = phraseTc[head + MAX_PHRASE_LEN];
   for (int pos = 0; pos < phraseLen; ++pos) {
-    if (phraseTc[head + pos] == Wildcard) {
+    int phraTc = phraseTc[head + pos];
+    if (phraTc == Wildcard || phraTc == Expr || phraTc == Expr0) {
       ++pos;
       int num = phraseTc[head + pos] - Zero;
-      wpc[num] = pc;
-      ++pc;
+      wpc[num] = pc; // トークンの位置（式の場合は式の開始位置）
+      if (phraTc == Wildcard) {
+        ++pc;
+        continue;
+      }
+      int depth = 0; // 括弧の深さ
+      for (;;) {
+        if (tc[pc] == Semicolon)
+          break;
+        if (tc[pc] == Comma && depth == 0)
+          break;
+
+        if (tc[pc] == Lparen || tc[pc] == Lbracket)
+          ++depth;
+        if (tc[pc] == Rparen || tc[pc] == Rbracket)
+          --depth;
+        if (depth < 0)
+          break;
+        ++pc;
+      }
+      wpc[_end(num)] = pc; // 式の終了位置
+      if (phraTc == Expr && wpc[num] == pc)
+        return 0;
+      if (depth > 0)
+        return 0;
       continue;
     }
-    if (phraseTc[head + pos] != tc[pc])
+    if (phraTc != tc[pc])
       return 0;
     ++pc;
   }
