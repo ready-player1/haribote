@@ -274,6 +274,7 @@ int compile(String src)
 
   int pc;
   for (pc = 0; pc < nTokens;) {
+    int e0 = 0;
     if (match(0, "!!*0 = !!*1;", pc)) {
       putIc(OpCpy, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], 0, 0);
     }
@@ -289,8 +290,9 @@ int compile(String src)
     else if (match(2, "!!*0 = !!*1 - !!*2;", pc)) {
       putIc(OpSub, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[2]]], 0);
     }
-    else if (match(3, "print !!*0;", pc)) {
-      putIc(OpPrint, &vars[tc[wpc[0]]], 0, 0, 0);
+    else if (match(3, "print !!**0;", pc)) {
+      e0 = expression(0);
+      putIc(OpPrint, &vars[e0], 0, 0, 0);
     }
     else if (match(4, "!!*0:", pc)) { // ラベル定義命令
       vars[tc[wpc[0]]] = icp - internalCodes; // ラベル名の変数にその時のicpの相対位置を入れておく
@@ -304,8 +306,8 @@ int compile(String src)
     else if (match(7, "time;", pc)) {
       putIc(OpTime, 0, 0, 0, 0);
     }
-    else if (match(8, ";", pc)) {
-      ;
+    else if (match(8, "!!***0;", pc)) {
+      e0 = expression(0);
     }
     else {
       goto err;
