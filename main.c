@@ -134,6 +134,7 @@ enum {
   Eight,
   Nine,
 
+  PlusPlus,
   Equal,
   NotEq,
   LesEq,
@@ -142,6 +143,11 @@ enum {
   Gtr,
   Plus,
   Minus,
+  Multi,
+  Divi,
+  Mod,
+  And,
+  ShiftRight,
   Assign,
 
   Lparen,
@@ -179,6 +185,7 @@ String defaultTokens[] = {
   "8",
   "9",
 
+  "++",
   "==",
   "!=",
   "<=",
@@ -187,6 +194,11 @@ String defaultTokens[] = {
   ">",
   "+",
   "-",
+  "*",
+  "/",
+  "%",
+  "&",
+  ">>",
   "=",
 
   "(",
