@@ -426,6 +426,86 @@ void tmpFree(int i)
 
 int epc, epcEnd; // expression()のためのpc, その式の直後のトークンを指す
 
+int expression(int num);
+
+int evalInfixExpression(int lhs, Precedence precedence, int op)
+{
+  return -1;
+}
+
+int evalExpression(Precedence precedence)
+{
+  int res = -1, e0 = 0;
+  nextPc = 0;
+
+  if (match(99, "( !!**0 )", epc)) { // 括弧
+    res = expression(0);
+  }
+  else if (tc[epc] == PlusPlus) { // 前置インクリメント
+    ++epc;
+    res = evalExpression(Prefix_PlusPlus);
+    putIc(OpAdd1, &vars[res], 0, 0, 0);
+  }
+  else if (tc[epc] == Minus) { // 単項マイナス
+    ++epc;
+    e0 = evalExpression(Prefix_Minus);
+    res = tmpAlloc();
+    putIc(OpNeg, &vars[res], &vars[e0], 0, 0);
+  }
+  else { // 変数もしくは定数
+    res = tc[epc];
+    ++epc;
+  }
+  if (nextPc > 0)
+    epc = nextPc;
+  for (;;) {
+    tmpFree(e0);
+    if (res < 0 || e0 < 0) // ここまででエラーがあれば、処理を打ち切り
+      return -1;
+    if (epc >= epcEnd)
+      break;
+
+    Precedence encountered; // ぶつかった演算子の優先順位を格納する
+    e0 = 0;
+    if (tc[epc] == PlusPlus) { // 後置インクリメント
+      ++epc;
+      e0 = res;
+      res = tmpAlloc();
+      putIc(OpCpy, &vars[res], &vars[e0], 0, 0);
+      putIc(OpAdd1, &vars[e0], 0, 0, 0);
+    }
+    else if (precedence >= (encountered = getPrecedence(Infix, tc[epc]))) {
+      /*
+        「引数として渡された優先順位」が「ぶつかった演算子の優先順位」よりも
+        低いか又は等しい(値が大きいか又は等しい)ときは、このブロックを実行して
+        中置演算子を評価する。
+
+        「引数として渡された優先順位」が「ぶつかった演算子の優先順位」よりも
+        高い(値が小さい)ときは、このブロックを実行せずにこれまでに式を評価した
+        結果を呼び出し元に返す。
+      */
+      switch (tc[epc]) {
+      case Multi: case Divi: case Mod:
+      case Plus: case Minus:
+      case ShiftRight:
+      case Les: case LesEq: case Gtr: case GtrEq:
+      case Equal: case NotEq:
+      case And:
+        res = evalInfixExpression(res, encountered - 1, tc[epc]);
+        break;
+      case Assign:
+        ++epc;
+        e0 = evalExpression(encountered);
+        putIc(OpCpy, &vars[res], &vars[e0], 0, 0);
+        break;
+      }
+    }
+    else
+      break;
+  }
+  return res;
+}
+
 // 引数として渡したワイルドカード番号にマッチした式をコンパイルしてinternalCodes[]に書き込む
 int expression(int num)
 {
