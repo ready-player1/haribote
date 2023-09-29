@@ -426,11 +426,26 @@ void tmpFree(int i)
 
 int epc, epcEnd; // expression()のためのpc, その式の直後のトークンを指す
 
+int evalExpression(Precedence precedence);
 int expression(int num);
+
+inline static Opcode getOpcode(int i) // for infix operators
+{
+  assert(Equal <= i && i < Assign);
+  return OpCeq + i - Equal;
+}
 
 int evalInfixExpression(int lhs, Precedence precedence, int op)
 {
-  return -1;
+  ++epc;
+  int rhs = evalExpression(precedence);
+  int res = tmpAlloc();
+  putIc(getOpcode(op), &vars[res], &vars[lhs], &vars[rhs], 0);
+  tmpFree(lhs);
+  tmpFree(rhs);
+  if (lhs < 0 || rhs < 0)
+    return -1;
+  return res;
 }
 
 int evalExpression(Precedence precedence)
