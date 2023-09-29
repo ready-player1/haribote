@@ -166,6 +166,17 @@ enum {
   Eight,
   Nine,
 
+  Tmp0,
+  Tmp1,
+  Tmp2,
+  Tmp3,
+  Tmp4,
+  Tmp5,
+  Tmp6,
+  Tmp7,
+  Tmp8,
+  Tmp9,
+
   EndOfKeys
 };
 
@@ -216,6 +227,17 @@ String defaultTokens[] = {
   "7",
   "8",
   "9",
+
+  "_t0",
+  "_t1",
+  "_t2",
+  "_t3",
+  "_t4",
+  "_t5",
+  "_t6",
+  "_t7",
+  "_t8",
+  "_t9",
 };
 
 void initTc(String *defaultTokens, int len)
@@ -381,6 +403,27 @@ void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
   icp += 5;
 }
 
+#define N_TMPS 10
+char tmpFlags[N_TMPS];
+
+int tmpAlloc()
+{
+  for (int i = 0; i < N_TMPS; ++i) {
+    if (!tmpFlags[i]) {
+      tmpFlags[i] = 1;
+      return Tmp0 + i;
+    }
+  }
+  printf("Register allocation failed\n");
+  return -1;
+}
+
+void tmpFree(int i)
+{
+  if (Tmp0 <= i && i <= Tmp9)
+    tmpFlags[i - Tmp0] = 0;
+}
+
 int epc, epcEnd; // expression()のためのpc, その式の直後のトークンを指す
 
 // 引数として渡したワイルドカード番号にマッチした式をコンパイルしてinternalCodes[]に書き込む
@@ -414,6 +457,9 @@ int compile(String src)
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = Period; // エラー表示用
 
   icp = internalCodes;
+
+  for (int i = 0; i < N_TMPS; ++i)
+    tmpFlags[i] = 0;
 
   int pc;
   for (pc = 0; pc < nTokens;) {
@@ -455,6 +501,9 @@ int compile(String src)
     else {
       goto err;
     }
+    tmpFree(e0);
+    if (e0 < 0)
+      goto err;
     pc = nextPc;
   }
   putIc(OpEnd, 0, 0, 0, 0);
