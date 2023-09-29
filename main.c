@@ -119,21 +119,6 @@ int lexer(String str, int *tc)
 int tc[10000]; // トークンコード列を格納する
 
 enum {
-  Wildcard,
-  Expr,
-  Expr0,
-
-  Zero,
-  One,
-  Two,
-  Three,
-  Four,
-  Five,
-  Six,
-  Seven,
-  Eight,
-  Nine,
-
   PlusPlus,
   Equal,
   NotEq,
@@ -166,25 +151,25 @@ enum {
   Goto,
   If,
 
+  Wildcard,
+  Expr,
+  Expr0,
+
+  Zero,
+  One,
+  Two,
+  Three,
+  Four,
+  Five,
+  Six,
+  Seven,
+  Eight,
+  Nine,
+
   EndOfKeys
 };
 
 String defaultTokens[] = {
-  "!!*",
-  "!!**",
-  "!!***",
-
-  "0",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-
   "++",
   "==",
   "!=",
@@ -216,6 +201,21 @@ String defaultTokens[] = {
   "time",
   "goto",
   "if",
+
+  "!!*",
+  "!!**",
+  "!!***",
+
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
 };
 
 void initTc(String *defaultTokens, int len)
@@ -223,6 +223,55 @@ void initTc(String *defaultTokens, int len)
   assert(len == EndOfKeys);
   for (int i = 0; i < len; ++i)
     tc[i] = getTokenCode(defaultTokens[i], strlen(defaultTokens[i]));
+}
+
+typedef enum {
+  Prefix_PlusPlus = 2,
+  Prefix_Minus = 2,
+  Infix_Multi = 4,
+  Infix_Divi = 4,
+  Infix_Mod = 4,
+  Infix_Plus = 5,
+  Infix_Minus = 5,
+  Infix_ShiftRight = 6,
+  Infix_LesEq = 7,
+  Infix_GtrEq = 7,
+  Infix_Les = 7,
+  Infix_Gtr = 7,
+  Infix_Equal = 8,
+  Infix_NotEq = 8,
+  Infix_And = 9,
+  Infix_Assign = 15,
+  LowestPrecedence = 99,
+  NoPrecedence = 100
+} Precedence;
+
+Precedence precedenceTable[][2] = {
+  [PlusPlus]   = {NoPrecedence,     Prefix_PlusPlus},
+  [Equal]      = {Infix_Equal,      NoPrecedence},
+  [NotEq]      = {Infix_NotEq,      NoPrecedence},
+  [LesEq]      = {Infix_LesEq,      NoPrecedence},
+  [GtrEq]      = {Infix_GtrEq,      NoPrecedence},
+  [Les]        = {Infix_Les,        NoPrecedence},
+  [Gtr]        = {Infix_Gtr,        NoPrecedence},
+  [Plus]       = {Infix_Plus,       NoPrecedence},
+  [Minus]      = {Infix_Minus,      Prefix_Minus},
+  [Multi]      = {Infix_Multi,      NoPrecedence},
+  [Divi]       = {Infix_Divi,       NoPrecedence},
+  [Mod]        = {Infix_Mod,        NoPrecedence},
+  [And]        = {Infix_And,        NoPrecedence},
+  [ShiftRight] = {Infix_ShiftRight, NoPrecedence},
+  [Assign]     = {Infix_Assign,     NoPrecedence},
+};
+
+enum { Infix, Prefix, EndOfStyles };
+
+inline static Precedence getPrecedence(int style, int operator)
+{
+  assert(0 <= style && style < EndOfStyles);
+  return 0 <= operator && operator < Lparen
+    ? precedenceTable[operator][style]
+    : NoPrecedence;
 }
 
 #define MAX_PHRASE_LEN 31
@@ -347,7 +396,7 @@ int expression(int num)
   int oldEpc = epc, oldEpcEnd = epcEnd;
 
   epc = wpc[num]; epcEnd = wpc[_end(num)];
-  int res = evalExpression(99);
+  int res = evalExpression(LowestPrecedence);
   if (epc < epcEnd)
     return -1;
 
