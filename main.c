@@ -320,6 +320,32 @@ void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
   icp += 5;
 }
 
+int epc, epcEnd; // expression()のためのpc, その式の直後のトークンを指す
+
+// 引数として渡したワイルドカード番号にマッチした式をコンパイルしてinternalCodes[]に書き込む
+int expression(int num)
+{
+  if (wpc[num] == wpc[_end(num)])
+    return 0;
+
+  int i, end = N_WILDCARDS * 2, buf[end + 1];
+  for (i = 0; i < end; ++i)
+    buf[i] = wpc[i];
+  buf[i] = nextPc;
+  int oldEpc = epc, oldEpcEnd = epcEnd;
+
+  epc = wpc[num]; epcEnd = wpc[_end(num)];
+  int res = evalExpression(99);
+  if (epc < epcEnd)
+    return -1;
+
+  for (i = 0; i < end; ++i)
+    wpc[i] = buf[i];
+  nextPc = buf[i];
+  epc = oldEpc; epcEnd = oldEpcEnd;
+  return res;
+}
+
 int compile(String src)
 {
   int nTokens = lexer(src, tc);
