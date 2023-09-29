@@ -348,8 +348,15 @@ char *readLine(char *str, int size, FILE *stream)
   assert(size > 0);
   setNonCanonicalMode();
 
-  int i = cursorX ? cursorX : 0, end = size - 1, ch, nDeleted = 0;
+  int i = cursorX ? cursorX : 0, end = size - 1, ch, nDeleted = 0, nInserted = 0;
+  char insertBuf[LINE_SIZE + 1] = "";
+
   while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
+    if (nInserted > 0 && (ch < 32 || ch == 127)) {
+      memmove(&str[cursorX], &str[cursorX - nInserted], insertBuf[LINE_SIZE]);
+      strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
+      insertBuf[0] = nInserted = 0;
+    }
     if (ch == 8 || ch == 127) { // Backspace or Delete
       if (cursorX == 0)
         continue;
@@ -367,6 +374,23 @@ char *readLine(char *str, int size, FILE *stream)
       memmove(&str[cursorX], &str[cursorX + nDeleted], i - cursorX - nDeleted);
       i -= nDeleted;
       str[i] = nDeleted = 0;
+    }
+    if (ch >= 32) { // printable characters
+      putchar(ch);
+      if (cursorX < i) {
+        if (nInserted == 0) {
+          insertBuf[LINE_SIZE] = i - cursorX;
+          str[i] = 0;
+        }
+        printf("\e7%s\e8", &str[cursorX - nInserted]);
+        insertBuf[nInserted] = ch;
+        ++nInserted;
+      }
+      else
+        str[cursorX] = ch;
+      ++cursorX;
+      ++i;
+      continue;
     }
 
     if (ch == '\n') {
@@ -439,20 +463,10 @@ char *readLine(char *str, int size, FILE *stream)
       setCanonicalMode();
       return str;
     }
-    else if (ch < 32) {
-      ;
-    }
-    else {
-      putchar(ch);
-      if (cursorX < i) {
-        str[i] = 0;
-        printf("\e7%s\e8", &str[cursorX]);
-        memmove(&str[cursorX + 1], &str[cursorX], i - cursorX);
-      }
-      str[cursorX] = ch;
-      ++cursorX;
-      ++i;
-    }
+  }
+  if (nInserted > 0) {
+    memmove(&str[cursorX], &str[cursorX - nInserted], insertBuf[LINE_SIZE]);
+    strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
   }
   str[i] = 0;
   cursorX = 0;
