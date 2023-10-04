@@ -544,6 +544,16 @@ int expression(int num)
   return res;
 }
 
+int tmpLabelNo;
+
+int tmpLabelAlloc()
+{
+  char str[10];
+  sprintf(str, "_l%d", tmpLabelNo);
+  ++tmpLabelNo;
+  return getTokenCode(str, strlen(str));
+}
+
 int compile(String src)
 {
   int nTokens = lexer(src, tc);
@@ -554,6 +564,7 @@ int compile(String src)
 
   for (int i = 0; i < N_TMPS; ++i)
     tmpFlags[i] = 0;
+  tmpLabelNo = 0;
 
   int pc;
   for (pc = 0; pc < nTokens;) {
