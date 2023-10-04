@@ -152,6 +152,8 @@ enum {
   If,
   Else,
   For,
+  Continue,
+  Break,
 
   Wildcard,
   Expr,
@@ -216,6 +218,8 @@ String defaultTokens[] = {
   "if",
   "else",
   "for",
+  "continue",
+  "break",
 
   "!!*",
   "!!**",
@@ -696,6 +700,7 @@ int compile(String src)
       curBlock = beginBlock();
       curBlock[ BlockType   ] = ForBlock;
       curBlock[ ForBegin    ] = tmpLabelAlloc();
+      curBlock[ ForContinue ] = tmpLabelAlloc();
       curBlock[ ForBreak    ] = tmpLabelAlloc();
       startLoop(&loopBlock);
 
@@ -704,12 +709,20 @@ int compile(String src)
       vars[curBlock[ForBegin]] = icp - internalCodes;
     }
     else if (match(12, "}", pc) && curBlock[BlockType] == ForBlock) {
+      vars[curBlock[ForContinue]] = icp - internalCodes;
+
       restoreExpr(1);
       ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
       vars[curBlock[ForBreak]] = icp - internalCodes;
 
       stopLoop(&loopBlock);
       curBlock = endBlock();
+    }
+    else if (match(15, "continue;", pc) && loopBlock) {
+      putIc(OpGoto, &vars[loopBlock[ForContinue]], 0, 0, 0);
+    }
+    else if (match(16, "break;", pc) && loopBlock) {
+      putIc(OpGoto, &vars[loopBlock[ForBreak]], 0, 0, 0);
     }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
