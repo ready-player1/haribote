@@ -672,7 +672,7 @@ int compile(String src)
       vars[tc[wpc[0]]] = icp - internalCodes; // ラベル名の変数にその時のicpの相対位置を入れておく
     }
     else if (match(5, "goto !!*0;", pc)) {
-      putIc(OpGoto, &vars[tc[wpc[0]]], 0, 0, 0);
+      putIc(OpGoto, &vars[tc[wpc[0]]], &vars[tc[wpc[0]]], 0, 0);
     }
     else if (match(6, "if (!!**0) goto !!*1;", pc)) {
       ifgoto(0, ConditionIsTrue, tc[wpc[1]]);
@@ -689,7 +689,7 @@ int compile(String src)
     }
     else if (match(13, "} else {", pc) && curBlock[BlockType] == IfBlock) {
       curBlock[IfLabel1] = tmpLabelAlloc(); // else節の終端
-      putIc(OpGoto, &vars[curBlock[IfLabel1]], 0, 0, 0);
+      putIc(OpGoto, &vars[curBlock[IfLabel1]], &vars[curBlock[IfLabel1]], 0, 0);
       vars[curBlock[IfLabel0]] = icp - internalCodes;
     }
     else if (match(12, "}", pc) && curBlock[BlockType] == IfBlock) {
@@ -730,7 +730,7 @@ int compile(String src)
         if (begin1 < end1)
           ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
         else
-          putIc(OpGoto, &vars[curBlock[ForBegin]], 0, 0, 0);
+          putIc(OpGoto, &vars[curBlock[ForBegin]], &vars[curBlock[ForBegin]], 0, 0);
       }
       vars[curBlock[ForBreak]] = icp - internalCodes;
 
@@ -738,10 +738,10 @@ int compile(String src)
       curBlock = endBlock();
     }
     else if (match(15, "continue;", pc) && loopBlock) {
-      putIc(OpGoto, &vars[loopBlock[ForContinue]], 0, 0, 0);
+      putIc(OpGoto, &vars[loopBlock[ForContinue]], &vars[loopBlock[ForContinue]], 0, 0);
     }
     else if (match(16, "break;", pc) && loopBlock) {
-      putIc(OpGoto, &vars[loopBlock[ForBreak]], 0, 0, 0);
+      putIc(OpGoto, &vars[loopBlock[ForBreak]], &vars[loopBlock[ForBreak]], 0, 0);
     }
     else if (match(17, "if (!!**0) continue;", pc) && loopBlock) {
       ifgoto(0, ConditionIsTrue, loopBlock[ForContinue]);
@@ -767,12 +767,16 @@ int compile(String src)
   }
   putIc(OpEnd, 0, 0, 0, 0);
 
-  IntPtr *end = icp;
+  IntPtr *end = icp, *tmpDest;
   Opcode op;
   for (icp = internalCodes; icp < end; icp += 5) { // goto先の設定
     op = (Opcode) icp[0];
-    if (OpGoto <= op && op <= OpLop)
-      icp[1] = (IntPtr) (internalCodes + *icp[1]);
+    if (OpGoto <= op && op <= OpLop) {
+      tmpDest = internalCodes + *icp[1];
+      while ((Opcode) tmpDest[0] == OpGoto) // goto先がOpGotoのときは、さらにその先を読む
+        tmpDest = internalCodes + *tmpDest[2];
+      icp[1] = (IntPtr) tmpDest;
+    }
   }
   return end - internalCodes;
 err:
