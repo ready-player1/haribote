@@ -647,7 +647,7 @@ int compile(String src)
 
   int pc;
   for (pc = 0; pc < nTokens;) {
-    int e0 = 0;
+    int e0 = 0, e2 = 0;
     if (match(0, "!!*0 = !!*1;", pc)) {
       putIc(OpCpy, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], 0, 0);
     }
@@ -696,7 +696,7 @@ int compile(String src)
       vars[curBlock[ifLabel]] = icp - internalCodes;
       curBlock = endBlock();
     }
-    else if (match(14, "for (; !!**1;) {", pc)) { // for文
+    else if (match(14, "for (!!***0; !!**1; !!***2) {", pc)) { // for文
       curBlock = beginBlock();
       curBlock[ BlockType   ] = ForBlock;
       curBlock[ ForBegin    ] = tmpLabelAlloc();
@@ -704,13 +704,17 @@ int compile(String src)
       curBlock[ ForBreak    ] = tmpLabelAlloc();
       startLoop(&loopBlock);
 
+      e0 = expression(0);
       saveExpr(1);
       ifgoto(1, ConditionIsFalse, curBlock[ForBreak]);
+      saveExpr(2);
       vars[curBlock[ForBegin]] = icp - internalCodes;
     }
     else if (match(12, "}", pc) && curBlock[BlockType] == ForBlock) {
       vars[curBlock[ForContinue]] = icp - internalCodes;
 
+      restoreExpr(2);
+      e2 = expression(2);
       restoreExpr(1);
       ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
       vars[curBlock[ForBreak]] = icp - internalCodes;
@@ -731,7 +735,8 @@ int compile(String src)
       goto err;
     }
     tmpFree(e0);
-    if (e0 < 0)
+    tmpFree(e2);
+    if (e0 < 0 || e2 < 0)
       goto err;
     pc = nextPc;
   }
