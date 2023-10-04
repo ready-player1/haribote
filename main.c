@@ -696,7 +696,7 @@ int compile(String src)
       vars[curBlock[ifLabel]] = icp - internalCodes;
       curBlock = endBlock();
     }
-    else if (match(14, "for (!!***0; !!**1; !!***2) {", pc)) { // for文
+    else if (match(14, "for (!!***0; !!***1; !!***2) {", pc)) { // for文
       curBlock = beginBlock();
       curBlock[ BlockType   ] = ForBlock;
       curBlock[ ForBegin    ] = tmpLabelAlloc();
@@ -706,7 +706,8 @@ int compile(String src)
 
       e0 = expression(0);
       saveExpr(1);
-      ifgoto(1, ConditionIsFalse, curBlock[ForBreak]);
+      if (wpc[1] < wpc[End_(1)])
+        ifgoto(1, ConditionIsFalse, curBlock[ForBreak]);
       saveExpr(2);
       vars[curBlock[ForBegin]] = icp - internalCodes;
     }
@@ -716,7 +717,10 @@ int compile(String src)
       restoreExpr(2);
       e2 = expression(2);
       restoreExpr(1);
-      ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
+      if (wpc[1] < wpc[End_(1)])
+        ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
+      else
+        putIc(OpGoto, &vars[curBlock[ForBegin]], 0, 0, 0);
       vars[curBlock[ForBreak]] = icp - internalCodes;
 
       stopLoop(&loopBlock);
@@ -727,6 +731,12 @@ int compile(String src)
     }
     else if (match(16, "break;", pc) && loopBlock) {
       putIc(OpGoto, &vars[loopBlock[ForBreak]], 0, 0, 0);
+    }
+    else if (match(17, "if (!!**0) continue;", pc) && loopBlock) {
+      ifgoto(0, ConditionIsTrue, loopBlock[ForContinue]);
+    }
+    else if (match(18, "if (!!**0) break;", pc) && loopBlock) {
+      ifgoto(0, ConditionIsTrue, loopBlock[ForBreak]);
     }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
