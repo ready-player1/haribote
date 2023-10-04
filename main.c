@@ -573,6 +573,29 @@ int tmpLabelAlloc()
   return getTokenCode(str, strlen(str));
 }
 
+#define BLOCK_INFO_SIZE 10
+int blockInfo[BLOCK_INFO_SIZE * 100], blockDepth;
+
+enum { BlockType };
+
+inline static int *initBlockInfo()
+{
+  blockDepth = 0;
+  return blockInfo;
+}
+
+inline static int *beginBlock()
+{
+  blockDepth += BLOCK_INFO_SIZE;
+  return &blockInfo[blockDepth];
+}
+
+inline static int *endBlock()
+{
+  blockDepth -= BLOCK_INFO_SIZE;
+  return &blockInfo[blockDepth];
+}
+
 int compile(String src)
 {
   int nTokens = lexer(src, tc);
@@ -584,6 +607,7 @@ int compile(String src)
   for (int i = 0; i < N_TMPS; ++i)
     tmpFlags[i] = 0;
   tmpLabelNo = 0;
+  int *curBlock = initBlockInfo();
 
   int pc;
   for (pc = 0; pc < nTokens;) {
@@ -629,6 +653,10 @@ int compile(String src)
     if (e0 < 0)
       goto err;
     pc = nextPc;
+  }
+  if (blockDepth > 0) {
+    printf("Block nesting error: blockDepth=%d", blockDepth);
+    return -1;
   }
   putIc(OpEnd, 0, 0, 0, 0);
 
