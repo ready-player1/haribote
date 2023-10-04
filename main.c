@@ -122,9 +122,9 @@ enum {
   PlusPlus,
   Equal,
   NotEq,
-  LesEq,
-  GtrEq,
   Les,
+  GtrEq,
+  LesEq,
   Gtr,
   Plus,
   Minus,
@@ -184,9 +184,9 @@ String defaultTokens[] = {
   "++",
   "==",
   "!=",
-  "<=",
-  ">=",
   "<",
+  ">=",
+  "<=",
   ">",
   "+",
   "-",
@@ -368,9 +368,9 @@ typedef enum {
   OpCpy,
   OpCeq,
   OpCne,
-  OpCle,
-  OpCge,
   OpClt,
+  OpCge,
+  OpCle,
   OpCgt,
   OpAdd,
   OpSub,
@@ -384,9 +384,9 @@ typedef enum {
   OpGoto,
   OpJeq,
   OpJne,
-  OpJle,
-  OpJge,
   OpJlt,
+  OpJge,
+  OpJle,
   OpJgt,
   OpLop,
   OpPrint,
@@ -544,6 +544,24 @@ int expression(int num)
   return res;
 }
 
+enum { ConditionIsTrue, ConditionIsFalse };
+
+// 条件式wpc[i]を評価して、その結果に応じてlabelに分岐する内部コードを生成する
+void ifgoto(int i, int not, int label)
+{
+  int begin = wpc[i];
+
+  if (begin + 3 == wpc[End_(i)] && Equal <= tc[begin + 1] && tc[begin + 1] <= Gtr) {
+    Opcode op = OpJeq + ((tc[begin + 1] - Equal) ^ not);
+    putIc(op, &vars[label], &vars[tc[begin]], &vars[tc[begin + 2]], 0);
+  }
+  else {
+    i = expression(i);
+    putIc(OpJne - not, &vars[label], &vars[i], &vars[Zero], 0);
+    tmpFree(i);
+  }
+}
+
 int tmpLabelNo;
 
 int tmpLabelAlloc()
@@ -594,8 +612,8 @@ int compile(String src)
     else if (match(5, "goto !!*0;", pc)) {
       putIc(OpGoto, &vars[tc[wpc[0]]], 0, 0, 0);
     }
-    else if (match(6, "if (!!*0 !!*1 !!*2) goto !!*3;", pc) && Equal <= tc[wpc[1]] && tc[wpc[1]] <= Gtr) {
-      putIc(OpJeq + (tc[wpc[1]] - Equal), &vars[tc[wpc[3]]], &vars[tc[wpc[0]]], &vars[tc[wpc[2]]], 0);
+    else if (match(6, "if (!!**0) goto !!*1;", pc)) {
+      ifgoto(0, ConditionIsTrue, tc[wpc[1]]);
     }
     else if (match(7, "time;", pc)) {
       putIc(OpTime, 0, 0, 0, 0);
