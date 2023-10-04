@@ -715,13 +715,23 @@ int compile(String src)
     else if (match(12, "}", pc) && curBlock[BlockType] == ForBlock) {
       vars[curBlock[ForContinue]] = icp - internalCodes;
 
-      restoreExpr(2);
-      e2 = expression(2);
       restoreExpr(1);
-      if (wpc[1] < wpc[_end(1)])
-        ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
-      else
-        putIc(OpGoto, &vars[curBlock[ForBegin]], 0, 0, 0);
+      restoreExpr(2);
+      int begin1 = wpc[1], end1 = wpc[_end(1)], begin2 = wpc[2], end2 = wpc[_end(2)];
+      int shouldOptimize =
+        begin1 + 3 == end1 && tc[begin1 + 1] == Les && begin2 + 2 == end2 &&
+        (tc[begin1] == tc[begin2] && tc[begin2 + 1] == PlusPlus ||
+         tc[begin1] == tc[begin2 + 1] && tc[begin2] == PlusPlus);
+
+      if (shouldOptimize)
+        putIc(OpLop, &vars[curBlock[ForBegin]], &vars[tc[begin1]], &vars[tc[begin1 + 2]], 0);
+      else {
+        e2 = expression(2);
+        if (begin1 < end1)
+          ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
+        else
+          putIc(OpGoto, &vars[curBlock[ForBegin]], 0, 0, 0);
+      }
       vars[curBlock[ForBreak]] = icp - internalCodes;
 
       stopLoop(&loopBlock);
