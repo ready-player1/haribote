@@ -576,7 +576,8 @@ int tmpLabelAlloc()
 #define BLOCK_INFO_SIZE 10
 int blockInfo[BLOCK_INFO_SIZE * 100], blockDepth;
 
-enum { BlockType };
+enum { BlockType, IfBlock };
+enum { IfLabel0 = 1 };
 
 inline static int *initBlockInfo()
 {
@@ -642,6 +643,16 @@ int compile(String src)
     }
     else if (match(7, "time;", pc)) {
       putIc(OpTime, 0, 0, 0, 0);
+    }
+    else if (match(11, "if (!!**0) {", pc)) { // if文
+      curBlock = beginBlock();
+      curBlock[ BlockType ] = IfBlock;
+      curBlock[ IfLabel0  ] = tmpLabelAlloc(); // 条件不成立のときの飛び先
+      ifgoto(0, ConditionIsFalse, curBlock[IfLabel0]);
+    }
+    else if (match(12, "}", pc) && curBlock[BlockType] == IfBlock) {
+      vars[curBlock[IfLabel0]] = icp - internalCodes;
+      curBlock = endBlock();
     }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
