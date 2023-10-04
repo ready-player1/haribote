@@ -151,6 +151,7 @@ enum {
   Goto,
   If,
   Else,
+  For,
 
   Wildcard,
   Expr,
@@ -214,6 +215,7 @@ String defaultTokens[] = {
   "goto",
   "if",
   "else",
+  "for",
 
   "!!*",
   "!!**",
@@ -575,14 +577,15 @@ int tmpLabelAlloc()
 }
 
 #define BLOCK_INFO_SIZE 10
-int blockInfo[BLOCK_INFO_SIZE * 100], blockDepth;
+int blockInfo[BLOCK_INFO_SIZE * 100], blockDepth, loopDepth;
 
-enum { BlockType, IfBlock };
+enum { BlockType, IfBlock, ForBlock };
 enum { IfLabel0 = 1, IfLabel1 };
+enum { ForBegin = 1, ForContinue, ForBreak, ForDepth, ForWpc1, ForWpcEnd1, ForWpc2, ForWpcEnd2 };
 
 inline static int *initBlockInfo()
 {
-  blockDepth = 0;
+  blockDepth = loopDepth = 0;
   return blockInfo;
 }
 
@@ -598,6 +601,33 @@ inline static int *endBlock()
   return &blockInfo[blockDepth];
 }
 
+inline static void startLoop(int **loopBlock)
+{
+  blockInfo[blockDepth + ForDepth] = loopDepth;
+  loopDepth = blockDepth;
+  *loopBlock = &blockInfo[loopDepth];
+}
+
+inline static void stopLoop(int **loopBlock)
+{
+  loopDepth = blockInfo[blockDepth + ForDepth];
+  *loopBlock = loopDepth == 0 ? NULL : &blockInfo[loopDepth];
+}
+
+inline static void saveExpr(int i)
+{
+  assert(blockInfo[blockDepth + BlockType] == ForBlock);
+  blockInfo[blockDepth + ForWpc1 - 2 + 2 * i] = wpc[i];
+  blockInfo[blockDepth + ForWpc1 - 2 + 2 * i + 1] = wpc[End_(i)];
+}
+
+inline static void restoreExpr(int i)
+{
+  assert(blockInfo[blockDepth + BlockType] == ForBlock);
+  wpc[i] = blockInfo[blockDepth + ForWpc1 - 2 + 2 * i];
+  wpc[End_(i)] = blockInfo[blockDepth + ForWpc1 - 2 + 2 * i + 1];
+}
+
 int compile(String src)
 {
   int nTokens = lexer(src, tc);
@@ -609,7 +639,7 @@ int compile(String src)
   for (int i = 0; i < N_TMPS; ++i)
     tmpFlags[i] = 0;
   tmpLabelNo = 0;
-  int *curBlock = initBlockInfo();
+  int *curBlock = initBlockInfo(), *loopBlock = NULL;
 
   int pc;
   for (pc = 0; pc < nTokens;) {
@@ -662,6 +692,25 @@ int compile(String src)
       vars[curBlock[ifLabel]] = icp - internalCodes;
       curBlock = endBlock();
     }
+    else if (match(14, "for (; !!**1;) {", pc)) { // for文
+      curBlock = beginBlock();
+      curBlock[ BlockType   ] = ForBlock;
+      curBlock[ ForBegin    ] = tmpLabelAlloc();
+      curBlock[ ForBreak    ] = tmpLabelAlloc();
+      startLoop(&loopBlock);
+
+      saveExpr(1);
+      ifgoto(1, ConditionIsFalse, curBlock[ForBreak]);
+      vars[curBlock[ForBegin]] = icp - internalCodes;
+    }
+    else if (match(12, "}", pc) && curBlock[BlockType] == ForBlock) {
+      restoreExpr(1);
+      ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
+      vars[curBlock[ForBreak]] = icp - internalCodes;
+
+      stopLoop(&loopBlock);
+      curBlock = endBlock();
+    }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
     }
@@ -674,7 +723,7 @@ int compile(String src)
     pc = nextPc;
   }
   if (blockDepth > 0) {
-    printf("Block nesting error: blockDepth=%d", blockDepth);
+    printf("Block nesting error: blockDepth=%d loopDepth=%d", blockDepth, loopDepth);
     return -1;
   }
   putIc(OpEnd, 0, 0, 0, 0);
