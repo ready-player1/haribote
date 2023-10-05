@@ -172,6 +172,7 @@ enum {
   For,
   Continue,
   Break,
+  Prints,
 
   Wildcard,
   Expr,
@@ -238,6 +239,7 @@ String defaultTokens[] = {
   "for",
   "continue",
   "break",
+  "prints",
 
   "!!*",
   "!!**",
@@ -417,6 +419,7 @@ typedef enum {
   OpLop,
   OpPrint,
   OpTime,
+  OpPrints,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -767,6 +770,10 @@ int compile(String src)
     else if (match(18, "if (!!**0) break;", pc) && loopBlock) {
       ifgoto(0, ConditionIsTrue, loopBlock[ForBreak]);
     }
+    else if (match(19, "prints !!**0;", pc)) {
+      e0 = expression(0);
+      putIc(OpPrints, &vars[e0], 0, 0, 0);
+    }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
     }
@@ -850,6 +857,10 @@ void exec()
         icp = (IntPtr *) icp[1];
         continue;
       }
+      icp += 5;
+      continue;
+    case OpPrints:
+      printf("%s\n", (char *) *icp[1]);
       icp += 5;
       continue;
     }
