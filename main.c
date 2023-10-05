@@ -8,6 +8,7 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 #include <assert.h>
@@ -46,7 +47,7 @@ int loadText(String path, String text, int size)
 String tokenStrs[MAX_TOKEN_CODE + 1];
 int    tokenLens[MAX_TOKEN_CODE + 1];
 
-int vars[MAX_TOKEN_CODE + 1];
+intptr_t vars[MAX_TOKEN_CODE + 1];
 
 int getTokenCode(String str, int len)
 {
@@ -366,7 +367,7 @@ int match(int id, String phrase, int pc)
   return 1;
 }
 
-typedef int *IntPtr;
+typedef intptr_t *IntPtr;
 
 IntPtr internalCodes[10000]; // ソースコードをコンパイルして生成した内部コードを格納する
 IntPtr *icp;
@@ -788,7 +789,7 @@ void exec()
 {
   clock_t begin = clock();
   icp = internalCodes;
-  int i;
+  intptr_t i;
   for (;;) {
     switch ((Opcode) icp[0]) {
     case OpEnd:
