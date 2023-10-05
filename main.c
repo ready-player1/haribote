@@ -420,6 +420,8 @@ typedef enum {
   OpPrint,
   OpTime,
   OpPrints,
+  OpAryNew,
+  OpAryInit,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -774,6 +776,37 @@ int compile(String src)
       e0 = expression(0);
       putIc(OpPrints, &vars[e0], 0, 0, 0);
     }
+    else if (match(20, "int !!*0[!!**2];", pc)) {
+      e2 = expression(2);
+      putIc(OpAryNew, &vars[tc[wpc[0]]], &vars[e2], 0, 0);
+    }
+    else if (match(21, "int !!*0[!!**2] = {", pc)) {
+      e2 = expression(2);
+      putIc(OpAryNew, &vars[tc[wpc[0]]], &vars[e2], 0, 0);
+
+      int pc, nElems = 0;
+      for (pc = nextPc; tc[pc] != Rbrace; ++pc) {
+        if (pc >= nTokens)
+          goto err;
+        if (tc[pc] != Comma)
+          ++nElems;
+      }
+      intptr_t *ary = malloc(nElems * sizeof(intptr_t));
+      if (ary == NULL) {
+        printf("Failed to allocate memory\n");
+        exit(1);
+      }
+
+      nElems = 0;
+      for (pc = nextPc; tc[pc] != Rbrace; ++pc) {
+        if (tc[pc] == Comma)
+          continue;
+        ary[nElems] = vars[tc[pc]];
+        ++nElems;
+      }
+      putIc(OpAryInit, &vars[tc[wpc[0]]], (IntPtr) ary, (IntPtr) nElems, 0);
+      nextPc = pc + 2; // } と ; の分
+    }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
     }
@@ -861,6 +894,19 @@ void exec()
       continue;
     case OpPrints:
       printf("%s\n", (char *) *icp[1]);
+      icp += 5;
+      continue;
+    case OpAryNew:
+      *icp[1] = (intptr_t) malloc(*icp[2] * sizeof(intptr_t));
+      if (*icp[1] == 0) {
+        printf("Failed to allocate memory\n");
+        exit(1);
+      }
+      memset((char *) *icp[1], 0, *icp[2] * sizeof(intptr_t));
+      icp += 5;
+      continue;
+    case OpAryInit:
+      memcpy((char *) *icp[1], (char *) icp[2], ((int) icp[3]) * sizeof(intptr_t));
       icp += 5;
       continue;
     }
