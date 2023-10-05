@@ -422,6 +422,8 @@ typedef enum {
   OpPrints,
   OpAryNew,
   OpAryInit,
+  OpAryGet,
+  OpArySet,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -481,7 +483,7 @@ int evalInfixExpression(int lhs, Precedence precedence, int op)
 
 int evalExpression(Precedence precedence)
 {
-  int res = -1, e0 = 0;
+  int res = -1, e0 = 0, e1 = 0;
   nextPc = 0;
 
   if (match(99, "( !!**0 )", epc)) { // 括弧
@@ -506,19 +508,34 @@ int evalExpression(Precedence precedence)
     epc = nextPc;
   for (;;) {
     tmpFree(e0);
-    if (res < 0 || e0 < 0) // ここまででエラーがあれば、処理を打ち切り
+    tmpFree(e1);
+    if (res < 0 || e0 < 0 || e1 < 0) // ここまででエラーがあれば、処理を打ち切り
       return -1;
     if (epc >= epcEnd)
       break;
 
     Precedence encountered; // ぶつかった演算子の優先順位を格納する
-    e0 = 0;
+    e0 = 0, e1 = 0;
     if (tc[epc] == PlusPlus) { // 後置インクリメント
       ++epc;
       e0 = res;
       res = tmpAlloc();
       putIc(OpCpy, &vars[res], &vars[e0], 0, 0);
       putIc(OpAdd1, &vars[e0], 0, 0, 0);
+    }
+    else if (match(70, "[!!**0]=", epc)) {
+      e1 = res;
+      e0 = expression(0);
+      epc = nextPc;
+      res = evalExpression(Infix_Assign);
+      putIc(OpArySet, &vars[e1], &vars[e0], &vars[res], 0);
+    }
+    else if (match(71, "[!!**0]", epc)) {
+      e1 = res;
+      res = tmpAlloc();
+      e0 = expression(0);
+      putIc(OpAryGet, &vars[e1], &vars[e0], &vars[res], 0);
+      epc = nextPc;
     }
     else if (precedence >= (encountered = getPrecedence(Infix, tc[epc]))) {
       /*
@@ -846,7 +863,7 @@ void exec()
 {
   clock_t begin = clock();
   icp = internalCodes;
-  intptr_t i;
+  intptr_t i, *a;
   for (;;) {
     switch ((Opcode) icp[0]) {
     case OpEnd:
@@ -898,7 +915,7 @@ void exec()
       continue;
     case OpAryNew:
       *icp[1] = (intptr_t) malloc(*icp[2] * sizeof(intptr_t));
-      if (*icp[1] == 0) {
+      if (*icp[1] == (intptr_t) NULL) {
         printf("Failed to allocate memory\n");
         exit(1);
       }
@@ -907,6 +924,18 @@ void exec()
       continue;
     case OpAryInit:
       memcpy((char *) *icp[1], (char *) icp[2], ((int) icp[3]) * sizeof(intptr_t));
+      icp += 5;
+      continue;
+    case OpArySet:
+      a = (intptr_t *) *icp[1];
+      i = *icp[2];
+      a[i] = *icp[3];
+      icp += 5;
+      continue;
+    case OpAryGet:
+      a = (intptr_t *) *icp[1];
+      i = *icp[2];
+      *icp[3] = a[i];
       icp += 5;
       continue;
     }
