@@ -72,6 +72,16 @@ int getTokenCode(String str, int len)
     ++nTokens;
 
     vars[i] = strtol(tokenStrs[i], NULL, 0); // 定数であれば初期値を設定（定数でなければ0になる）
+    if (tokenStrs[i][0] == '"') {
+      char *p = malloc(len - 1);
+      if (p == NULL) {
+        printf("Failed to allocate memory\n");
+        exit(1);
+      }
+      vars[i] = (intptr_t) p;
+      memcpy(p, tokenStrs[i] + 1, len - 2); // 手抜き実装（エスケープシーケンスを処理していない）
+      p[len - 2] = 0;
+    }
   }
   return i;
 }
@@ -105,6 +115,13 @@ int lexer(String str, int *tc)
     }
     else if (strchr("=+-*/!%&~|<>?:.#", str[pos]) != NULL) {
       while (strchr("=+-*/!%&~|<>?:.#", str[pos + len]) != NULL && str[pos + len] != 0)
+        ++len;
+    }
+    else if (str[pos] == '"') { // 文字列
+      len = 1;
+      while (str[pos + len] != str[pos] && str[pos + len] >= ' ')
+        ++len;
+      if (str[pos + len] == str[pos])
         ++len;
     }
     else {
