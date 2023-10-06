@@ -698,11 +698,8 @@ int compile(String src)
     else if (match(9, "!!*0 = !!*1 + 1;", pc) && tc[wpc[0]] == tc[wpc[1]]) { // +1専用の命令
       putIc(OpAdd1, &vars[tc[wpc[0]]], 0, 0, 0);
     }
-    else if (match(1, "!!*0 = !!*1 + !!*2;", pc)) {
-      putIc(OpAdd, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[2]]], 0);
-    }
-    else if (match(2, "!!*0 = !!*1 - !!*2;", pc)) {
-      putIc(OpSub, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[2]]], 0);
+    else if (match(1, "!!*0 = !!*1 !!*2 !!*3;", pc) && Equal <= tc[wpc[2]] && tc[wpc[2]] < Assign) { // 加算、減算など
+      putIc(OpCeq + tc[wpc[2]] - Equal, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[3]]], 0);
     }
     else if (match(3, "print !!**0;", pc)) {
       e0 = expression(0);
