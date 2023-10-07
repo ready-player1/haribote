@@ -152,6 +152,7 @@ enum {
   And,
   ShiftRight,
   Assign,
+  Ex,
 
   Lparen,
   Rparen,
@@ -219,6 +220,7 @@ String defaultTokens[] = {
   "&",
   ">>",
   "=",
+  "!",
 
   "(",
   ")",
@@ -278,6 +280,7 @@ void initTc(String *defaultTokens, int len)
 typedef enum {
   Prefix_PlusPlus = 2,
   Prefix_Minus = 2,
+  Prefix_Ex = 2,
   Infix_Multi = 4,
   Infix_Divi = 4,
   Infix_Mod = 4,
@@ -312,6 +315,7 @@ Precedence precedenceTable[][2] = {
   [And]        = {Infix_And,        NoPrecedence},
   [ShiftRight] = {Infix_ShiftRight, NoPrecedence},
   [Assign]     = {Infix_Assign,     NoPrecedence},
+  [Ex]         = {NoPrecedence,     Prefix_Ex},
 };
 
 enum { Infix, Prefix, EndOfStyles };
@@ -408,6 +412,7 @@ typedef enum {
   OpBand,
   OpShr,
   OpAdd1,
+  OpNot,
   OpNeg,
   OpGoto,
   OpJeq,
@@ -499,6 +504,12 @@ int evalExpression(Precedence precedence)
     e0 = evalExpression(getPrecedence(Prefix, Minus));
     res = tmpAlloc();
     putIc(OpNeg, &vars[res], &vars[e0], 0, 0);
+  }
+  else if (tc[epc] == Ex) { // 論理否定
+    ++epc;
+    e0 = evalExpression(getPrecedence(Prefix, Ex));
+    res = tmpAlloc();
+    putIc(OpNot, &vars[res], &vars[e0], 0, 0);
   }
   else { // 変数もしくは定数
     res = tc[epc];
@@ -866,6 +877,7 @@ void exec()
     case OpEnd:
       return;
     case OpNeg:   *icp[1] = -*icp[2];           icp += 5; continue;
+    case OpNot:   *icp[1] = !*icp[2];           icp += 5; continue;
     case OpAdd1:  ++(*icp[1]);                  icp += 5; continue;
     case OpMul:   *icp[1] = *icp[2] *  *icp[3]; icp += 5; continue;
     case OpDiv:   *icp[1] = *icp[2] /  *icp[3]; icp += 5; continue;
