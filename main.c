@@ -487,11 +487,18 @@ int evalInfixExpression(int lhs, Precedence precedence, int op)
 
 int evalExpression(Precedence precedence)
 {
-  int res = -1, e0 = 0, e1 = 0;
+  int res = -1, e0 = 0, e1 = 0, e2 = 0;
   nextPc = 0;
 
   if (match(99, "( !!**0 )", epc)) { // 括弧
     res = expression(0);
+  }
+  else if (match(72, "!!*0!!*1[!!**2]", epc) && tc[wpc[0]] == PlusPlus) { // 前置インクリメント
+    e2 = expression(2);
+    res = tmpAlloc();
+    putIc(OpAryGet, &vars[tc[wpc[1]]], &vars[e2], &vars[res], 0);
+    putIc(OpAdd1, &vars[res], 0, 0, 0);
+    putIc(OpArySet, &vars[tc[wpc[1]]], &vars[e2], &vars[res], 0);
   }
   else if (tc[epc] == PlusPlus) { // 前置インクリメント
     ++epc;
@@ -519,19 +526,30 @@ int evalExpression(Precedence precedence)
   for (;;) {
     tmpFree(e0);
     tmpFree(e1);
-    if (res < 0 || e0 < 0 || e1 < 0) // ここまででエラーがあれば、処理を打ち切り
+    tmpFree(e2);
+    if (res < 0 || e0 < 0 || e1 < 0 || e2 < 0) // ここまででエラーがあれば、処理を打ち切り
       return -1;
     if (epc >= epcEnd)
       break;
 
     Precedence encountered; // ぶつかった演算子の優先順位を格納する
-    e0 = 0, e1 = 0;
+    e0 = 0, e1 = 0, e2 = 0;
     if (tc[epc] == PlusPlus) { // 後置インクリメント
       ++epc;
       e0 = res;
       res = tmpAlloc();
       putIc(OpCpy, &vars[res], &vars[e0], 0, 0);
       putIc(OpAdd1, &vars[e0], 0, 0, 0);
+    }
+    else if (match(73, "[!!**0]!!*1", epc) && tc[wpc[1]] == PlusPlus) { // 後置インクリメント
+      e1 = res;
+      res = tmpAlloc();
+      e0 = expression(0);
+      epc = nextPc;
+      putIc(OpAryGet, &vars[e1], &vars[e0], &vars[res], 0);
+      e2 = tmpAlloc();
+      putIc(OpAdd, &vars[e2], &vars[res], &vars[One], 0);
+      putIc(OpArySet, &vars[e1], &vars[e0], &vars[e2], 0);
     }
     else if (match(70, "[!!**0]=", epc)) {
       e1 = res;
