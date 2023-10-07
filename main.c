@@ -171,6 +171,7 @@ enum {
   If,
   Else,
   For,
+  While,
   Continue,
   Break,
   Prints,
@@ -239,6 +240,7 @@ String defaultTokens[] = {
   "if",
   "else",
   "for",
+  "while",
   "continue",
   "break",
   "prints",
@@ -652,9 +654,9 @@ int tmpLabelAlloc()
 #define BLOCK_INFO_SIZE 10
 int blockInfo[BLOCK_INFO_SIZE * 100], blockDepth, loopDepth;
 
-enum { BlockType, IfBlock, ForBlock };
+enum { BlockType, IfBlock, ForBlock, WhileBlock };
 enum { IfLabel0 = 1, IfLabel1 };
-enum { ForBegin = 1, ForContinue, ForBreak, ForDepth, ForWpc1, ForWpcEnd1, ForWpc2, ForWpcEnd2 };
+enum { LoopBegin = 1, LoopContinue, LoopBreak, LoopDepth, LoopWpc1, LoopWpcEnd1, LoopWpc2, LoopWpcEnd2 };
 
 inline static int *initBlockInfo()
 {
@@ -676,29 +678,55 @@ inline static int *endBlock()
 
 inline static void startLoop(int **loopBlock)
 {
-  blockInfo[blockDepth + ForDepth] = loopDepth;
+  blockInfo[blockDepth + LoopDepth] = loopDepth;
   loopDepth = blockDepth;
   *loopBlock = &blockInfo[loopDepth];
 }
 
 inline static void stopLoop(int **loopBlock)
 {
-  loopDepth = blockInfo[blockDepth + ForDepth];
+  loopDepth = blockInfo[blockDepth + LoopDepth];
   *loopBlock = loopDepth == 0 ? NULL : &blockInfo[loopDepth];
 }
 
 inline static void saveExpr(int i)
 {
-  assert(blockInfo[blockDepth + BlockType] == ForBlock);
-  blockInfo[blockDepth + ForWpc1 - 2 + 2 * i] = wpc[i];
-  blockInfo[blockDepth + ForWpc1 - 2 + 2 * i + 1] = wpc[End_(i)];
+  int type = blockInfo[blockDepth + BlockType], head;
+#if defined(NDEBUG)
+  head = LoopWpc1 - 2;
+#else
+  if (type == ForBlock && (i == 1 || i == 2))
+    head = LoopWpc1 - 2;
+  else if (type == WhileBlock && i == 1)
+    head = LoopWpc1 - 2;
+  else {
+    printf("%s:%s:%d: ", __FILE__, __FUNCTION__, __LINE__);
+    printf("Not implemented error: BlockType=%d (i=%d) is not availavle\n", type, i);
+    exit(1);
+  }
+#endif
+  blockInfo[blockDepth + head + 2 * i] = wpc[i];
+  blockInfo[blockDepth + head + 2 * i + 1] = wpc[End_(i)];
 }
 
 inline static void restoreExpr(int i)
 {
-  assert(blockInfo[blockDepth + BlockType] == ForBlock);
-  wpc[i] = blockInfo[blockDepth + ForWpc1 - 2 + 2 * i];
-  wpc[End_(i)] = blockInfo[blockDepth + ForWpc1 - 2 + 2 * i + 1];
+  int type = blockInfo[blockDepth + BlockType], head;
+#if defined(NDEBUG)
+  head = LoopWpc1 - 2;
+#else
+  if (type == ForBlock && (i == 1 || i == 2))
+    head = LoopWpc1 - 2;
+  else if (type == WhileBlock && i == 1)
+    head = LoopWpc1 - 2;
+  else {
+    printf("%s:%s:%d: ", __FILE__, __FUNCTION__, __LINE__);
+    printf("Not implemented error: BlockType=%d (i=%d) is not availavle\n", type, i);
+    exit(1);
+  }
+#endif
+  wpc[i] = blockInfo[blockDepth + head + 2 * i];
+  wpc[End_(i)] = blockInfo[blockDepth + head + 2 * i + 1];
 }
 
 int compile(String src)
@@ -764,21 +792,21 @@ int compile(String src)
     }
     else if (match(14, "for (!!***0; !!***1; !!***2) {", pc)) { // for文
       curBlock = beginBlock();
-      curBlock[ BlockType   ] = ForBlock;
-      curBlock[ ForBegin    ] = tmpLabelAlloc();
-      curBlock[ ForContinue ] = tmpLabelAlloc();
-      curBlock[ ForBreak    ] = tmpLabelAlloc();
+      curBlock[ BlockType    ] = ForBlock;
+      curBlock[ LoopBegin    ] = tmpLabelAlloc();
+      curBlock[ LoopContinue ] = tmpLabelAlloc();
+      curBlock[ LoopBreak    ] = tmpLabelAlloc();
       startLoop(&loopBlock);
 
       e0 = expression(0);
       saveExpr(1);
       if (wpc[1] < wpc[End_(1)])
-        ifgoto(1, ConditionIsFalse, curBlock[ForBreak]);
+        ifgoto(1, ConditionIsFalse, curBlock[LoopBreak]);
       saveExpr(2);
-      vars[curBlock[ForBegin]] = icp - internalCodes;
+      vars[curBlock[LoopBegin]] = icp - internalCodes;
     }
     else if (match(12, "}", pc) && curBlock[BlockType] == ForBlock) {
-      vars[curBlock[ForContinue]] = icp - internalCodes;
+      vars[curBlock[LoopContinue]] = icp - internalCodes;
 
       restoreExpr(1);
       restoreExpr(2);
@@ -789,30 +817,52 @@ int compile(String src)
          tc[begin1] == tc[begin2 + 1] && tc[begin2] == PlusPlus);
 
       if (shouldOptimize)
-        putIc(OpLop, &vars[curBlock[ForBegin]], &vars[tc[begin1]], &vars[tc[begin1 + 2]], 0);
+        putIc(OpLop, &vars[curBlock[LoopBegin]], &vars[tc[begin1]], &vars[tc[begin1 + 2]], 0);
       else {
         e2 = expression(2);
         if (begin1 < end1)
-          ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
+          ifgoto(1, ConditionIsTrue, curBlock[LoopBegin]);
         else
-          putIc(OpGoto, &vars[curBlock[ForBegin]], &vars[curBlock[ForBegin]], 0, 0);
+          putIc(OpGoto, &vars[curBlock[LoopBegin]], &vars[curBlock[LoopBegin]], 0, 0);
       }
-      vars[curBlock[ForBreak]] = icp - internalCodes;
+      vars[curBlock[LoopBreak]] = icp - internalCodes;
+
+      stopLoop(&loopBlock);
+      curBlock = endBlock();
+    }
+    else if (match(22, "while (!!**1) {", pc)) { // while文
+      curBlock = beginBlock();
+      curBlock[ BlockType    ] = WhileBlock;
+      curBlock[ LoopBegin    ] = tmpLabelAlloc();
+      curBlock[ LoopContinue ] = tmpLabelAlloc();
+      curBlock[ LoopBreak    ] = tmpLabelAlloc();
+      startLoop(&loopBlock);
+
+      saveExpr(1);
+      ifgoto(1, ConditionIsFalse, curBlock[LoopBreak]);
+      vars[curBlock[LoopBegin]] = icp - internalCodes;
+    }
+    else if (match(12, "}", pc) && curBlock[BlockType] == WhileBlock) {
+      vars[curBlock[LoopContinue]] = icp - internalCodes;
+
+      restoreExpr(1);
+      ifgoto(1, ConditionIsTrue, curBlock[LoopBegin]);
+      vars[curBlock[LoopBreak]] = icp - internalCodes;
 
       stopLoop(&loopBlock);
       curBlock = endBlock();
     }
     else if (match(15, "continue;", pc) && loopBlock) {
-      putIc(OpGoto, &vars[loopBlock[ForContinue]], &vars[loopBlock[ForContinue]], 0, 0);
+      putIc(OpGoto, &vars[loopBlock[LoopContinue]], &vars[loopBlock[LoopContinue]], 0, 0);
     }
     else if (match(16, "break;", pc) && loopBlock) {
-      putIc(OpGoto, &vars[loopBlock[ForBreak]], &vars[loopBlock[ForBreak]], 0, 0);
+      putIc(OpGoto, &vars[loopBlock[LoopBreak]], &vars[loopBlock[LoopBreak]], 0, 0);
     }
     else if (match(17, "if (!!**0) continue;", pc) && loopBlock) {
-      ifgoto(0, ConditionIsTrue, loopBlock[ForContinue]);
+      ifgoto(0, ConditionIsTrue, loopBlock[LoopContinue]);
     }
     else if (match(18, "if (!!**0) break;", pc) && loopBlock) {
-      ifgoto(0, ConditionIsTrue, loopBlock[ForBreak]);
+      ifgoto(0, ConditionIsTrue, loopBlock[LoopBreak]);
     }
     else if (match(19, "prints !!**0;", pc)) {
       e0 = expression(0);
