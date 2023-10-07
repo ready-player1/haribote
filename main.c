@@ -431,6 +431,7 @@ typedef enum {
   OpAryInit,
   OpAryGet,
   OpArySet,
+  OpPrm,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -729,6 +730,26 @@ inline static void restoreExpr(int i)
   wpc[End_(i)] = blockInfo[blockDepth + head + 2 * i + 1];
 }
 
+int exprsPutIc(int times, Opcode op, int tmpReg, int *err)
+{
+  int hasTmpAlloced = tmpReg != 0, e[8] = {0};
+  if (hasTmpAlloced)
+    e[0] = tmpReg;
+  for (int i = hasTmpAlloced; i < times; ++i)
+    e[i] = expression(i);
+
+  putIc(op, &vars[e[0]], &vars[e[1]], &vars[e[2]], &vars[e[3]]);
+  if (times > 4)
+    putIc(OpPrm, &vars[e[4]], &vars[e[5]], &vars[e[6]], &vars[e[7]]);
+
+  for (int i = hasTmpAlloced; i < times; ++i) {
+    if (e[i] < 0)
+      *err = -1;
+    tmpFree(e[i]);
+  }
+  return tmpReg;
+}
+
 int compile(String src)
 {
   int nTokens = lexer(src, tc);
@@ -758,8 +779,7 @@ int compile(String src)
       putIc(OpCeq + tc[wpc[2]] - Equal, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[3]]], 0);
     }
     else if (match(3, "print !!**0;", pc)) {
-      e0 = expression(0);
-      putIc(OpPrint, &vars[e0], 0, 0, 0);
+      exprsPutIc(1, OpPrint, 0, &e0);
     }
     else if (match(4, "!!*0:", pc)) { // ラベル定義命令
       vars[tc[wpc[0]]] = icp - internalCodes; // ラベル名の変数にその時のicpの相対位置を入れておく
@@ -865,8 +885,7 @@ int compile(String src)
       ifgoto(0, ConditionIsTrue, loopBlock[LoopBreak]);
     }
     else if (match(19, "prints !!**0;", pc)) {
-      e0 = expression(0);
-      putIc(OpPrints, &vars[e0], 0, 0, 0);
+      exprsPutIc(1, OpPrints, 0, &e0);
     }
     else if (match(20, "int !!*0[!!**2];", pc)) {
       e2 = expression(2);
@@ -1014,6 +1033,10 @@ void exec()
       *icp[3] = obj[i];
       icp += 5;
       continue;
+    case OpPrm:
+      printf("%s:%s:%d: ", __FILE__, __FUNCTION__, __LINE__);
+      printf("Should not reach here\n");
+      exit(1);
     }
   }
 }
