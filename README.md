@@ -73,6 +73,6 @@ $ gcc -I/path/to/acl_sdl2 -DAARCH_X64 -O3 -Wno-pointer-sign -o haribote main.c `
 
 #### Note
 
-`gcc`の例は、Ubuntuに`libsdl2-2.0-0`を`apt`コマンドでインストールして確認しました（aclライブラリは`aclib17`を使用）。
+`gcc`の例は、Ubuntuに`libsdl2-2.0-0`を`apt`コマンドでインストールして確認しました（aclライブラリはSDL2.0版を使用）。
 
-`clan`の例は、macOS x86_64に`sdl2`を`brew`コマンドでインストールして確認しました（aclライブラリは`aclib06`を使用）。
+`clan`の例は、macOS x86_64に`sdl2`を`brew`コマンドでインストールして確認しました（aclライブラリはSDL2.0版を使用）。
