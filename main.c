@@ -467,13 +467,14 @@ char tmpFlags[N_TMPS];
 
 int tmpAlloc()
 {
-  int i = 0;
-  while (tmpFlags[i] != 0) {
-    assert(i < N_TMPS);
-    ++i;
+  for (int i = 0; i < N_TMPS; ++i) {
+    if (!tmpFlags[i]) {
+      tmpFlags[i] = 1;
+      return Tmp0 + i;
+    }
   }
-  tmpFlags[i] = 1;
-  return Tmp0 + i;
+  printf("Register allocation failed\n");
+  return -1;
 }
 
 void tmpFree(int i)
