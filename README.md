@@ -76,3 +76,28 @@ $ gcc -I/path/to/acl_sdl2 -DAARCH_X64 -O3 -Wno-pointer-sign -o haribote main.c `
 `gcc`の例は、Ubuntuに`libsdl2-2.0-0`を`apt`コマンドでインストールして確認しました（aclライブラリはSDL2.0版を使用）。
 
 `clan`の例は、macOS x86_64に`sdl2`を`brew`コマンドでインストールして確認しました（aclライブラリはSDL2.0版を使用）。
+
+## 履歴確認用ブランチ
+
+`main`ブランチや`demo`ブランチは、ソースコードの変更をブランチの先頭にコミットします。バグ修正をおこなうと履歴が残ります。
+
+それに対して`hist`ブランチは、`git rebase -i`コマンドを使って、直接、バグが発生したコミットを書き換えます。バグの痕跡は残りません。
+
+`hist`ブランチは、`main`ブランチや`demo`ブランチにマージされることのない履歴確認用ブランチです。
+
+写経をおこなう際など、差分にバグ修正履歴を含む必要がない場合は、`hist`ブランチに切り替えて`git log -p`コマンドを使うとよいでしょう。
+
+### Switching to hist branch
+
+1. リモートから変更を取得し、`hist`ブランチをチェックアウトします
+
+```
+$ git fetch origin hist
+$ git checkout hist
+```
+
+2. 差分をパッチ形式で表示します
+
+```
+$ git log -p
+```
