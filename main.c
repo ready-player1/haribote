@@ -124,6 +124,14 @@ int lexer(String str, int *tc)
       printf("Lexing error: %.10s\n", &str[pos]);
       exit(1);
     }
+    if (strncmp(&str[pos], "//", 2) == 0) {
+comment:
+      while (str[pos] != 0 && str[pos] != '\n')
+        ++pos;
+      continue;
+    }
+    if (len == 7 && strncmp(&str[pos], "include", 7) == 0) // includeを無視する
+      goto comment;
     tc[nTokens] = getTokenCode(&str[pos], len);
     pos += len;
     ++nTokens;
@@ -692,7 +700,7 @@ int tmpLabelAlloc()
 #define BLOCK_INFO_SIZE 10
 int blockInfo[BLOCK_INFO_SIZE * 100], blockDepth, loopDepth;
 
-enum { BlockType, IfBlock, ForBlock, WhileBlock };
+enum { BlockType, IfBlock, ForBlock, WhileBlock, MainBlock };
 enum { IfLabel0 = 1, IfLabel1 };
 enum { LoopBegin = 1, LoopContinue, LoopBreak, LoopDepth, LoopWpc1, LoopWpcEnd1, LoopWpc2, LoopWpcEnd2 };
 
@@ -972,6 +980,24 @@ int compile(String src)
     }
     else if (match(28, "bitblt(!!***8, !!**0, !!**1, !!**2, !!**3, !!**4);", pc)) {
       exprsPutIc(5, OpBitBlt, 0, &e0);
+    }
+    else if (match(29, "printTime();", pc)) { // time;と同じ（C言語っぽく書けるようにした）
+      putIc(OpTime, 0, 0, 0, 0);
+    }
+    else if (match(30, "void aMain() {", pc)) {
+      curBlock = beginBlock();
+      curBlock[BlockType] = MainBlock;
+    }
+    else if (match(12, "}", pc) && curBlock[BlockType] == MainBlock) {
+      curBlock = endBlock();
+    }
+    else if (match(31, "#", pc)) {
+      ;
+    }
+    else if (match(32, "int", pc) || match(33, "AWindow", pc)) {
+      while (tc[pc] != Semicolon)
+        ++pc;
+      nextPc = pc;
     }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
