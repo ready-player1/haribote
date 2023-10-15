@@ -777,6 +777,9 @@ inline static void restoreExpr(int i)
 
 int exprsPutIc(int times, Opcode op, int tmpReg, int *err)
 {
+  if (tmpReg < 0)
+    return -1;
+
   int hasTmpAlloced = tmpReg != 0, e[8] = {0};
   if (hasTmpAlloced)
     e[0] = tmpReg;
