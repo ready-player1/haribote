@@ -20,7 +20,7 @@ hariboteは、はりぼて言語の処理系です。HL-1からHL-9aまでの各
 
 - `gcc` or `clang`
 
-HL-9, HL-9aをコンパイルする際は`aclib`が必要です（See [aclライブラリの入手方法](https://essen.osask.jp/?a21_txt01_9)）。
+HL-9, HL-9aをコンパイルする際は`aclib`が必要です（See [aclライブラリの入手方法](https://essen.osask.jp/?a21_txt01_9#content_1_4)）。
 
 ## Building
 
