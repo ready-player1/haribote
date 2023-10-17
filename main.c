@@ -325,7 +325,7 @@ enum { Infix, Prefix, EndOfStyles };
 inline static Precedence getPrecedence(int style, int operator)
 {
   assert(0 <= style && style < EndOfStyles);
-  return 0 <= operator && operator <= Assign
+  return 0 <= operator && operator < Lparen
     ? precedenceTable[operator][style]
     : NoPrecedence;
 }
