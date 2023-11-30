@@ -75,7 +75,7 @@ $ gcc -I/path/to/acl_sdl2 -DAARCH_X64 -O3 -Wno-pointer-sign -o haribote main.c `
 
 `gcc`の例は、Ubuntuに`libsdl2-2.0-0`を`apt`コマンドでインストールして確認しました（aclライブラリはSDL2.0版を使用）。
 
-`clan`の例は、macOS x86_64に`sdl2`を`brew`コマンドでインストールして確認しました（aclライブラリはSDL2.0版を使用）。
+`clang`の例は、macOS x86_64に`sdl2`を`brew`コマンドでインストールして確認しました（aclライブラリはSDL2.0版を使用）。
 
 ## 履歴確認用ブランチ
 
