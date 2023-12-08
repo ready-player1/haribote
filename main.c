@@ -13,22 +13,28 @@
 
 typedef unsigned char *String;
 
-void loadText(int argc, const char **argv, String text, int size)
+int loadText(String path, String text, int size)
 {
-  if (argc < 2) {
-    printf("Usage: %s program-file\n", argv[0]);
-    exit(1);
-  }
+  unsigned char buf[1000];
 
-  FILE *fp = fopen(argv[1], "rt");
+  int startPos = path[0] == '"'; // ダブルクォートがあれば外す
+  int i = 0;
+  while (path[startPos + i] != 0 && path[startPos + i] != '"') {
+    buf[i] = path[startPos + i];
+    ++i;
+  }
+  buf[i] = 0;
+
+  FILE *fp = fopen(buf, "rt");
   if (fp == NULL) {
-    printf("Failed to open %s\n", argv[1]);
-    exit(1);
+    printf("Failed to open %s\n", path);
+    return 1;
   }
 
   int nItems = fread(text, 1, size - 1, fp);
   fclose(fp);
   text[nItems] = 0;
+  return 0;
 }
 
 #define MAX_TOKEN_CODE 1000 // トークンコードの最大値
@@ -107,10 +113,9 @@ int lexer(String str, int *tc)
 
 int tc[10000]; // トークンコードを格納する
 
-int main(int argc, const char **argv)
+int run(String src)
 {
-  unsigned char text[10000];
-  loadText(argc, argv, text, 10000);
+  clock_t begin = clock();
 
   int equal     = getTokenCode("==", 2);
   int notEq     = getTokenCode("!=", 2);
@@ -131,7 +136,8 @@ int main(int argc, const char **argv)
   int _goto     = getTokenCode("goto", 4);
   int _if       = getTokenCode("if", 2);
 
-  int nTokens = lexer(text, tc);
+  int nTokens = lexer(src, tc);
+  tc[nTokens++] = semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
 
   int pc;
@@ -167,7 +173,9 @@ int main(int argc, const char **argv)
       if (op == gtr   && lhs >  rhs) { pc = dest; continue; }
     }
     else if (tc[pc] == time && tc[pc + 1] == semicolon)
-      printf("time: %.3f[sec]\n", clock() / (double) CLOCKS_PER_SEC);
+      printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
+    else if (tc[pc] == semicolon)
+      ;
     else
       goto err;
 
@@ -175,8 +183,51 @@ int main(int argc, const char **argv)
       ++pc;
     ++pc; // セミコロンを読み飛ばす
   }
-  exit(0);
+  return 0;
 err:
   printf("Syntax error: %s %s %s %s\n", tokenStrs[tc[pc]], tokenStrs[tc[pc + 1]], tokenStrs[tc[pc + 2]], tokenStrs[tc[pc + 3]]);
-  exit(1);
+  return 1;
+}
+
+String removeTrailingSemicolon(String str, size_t len) {
+  for (int i = len - 1; i >= 0; --i) {
+    if (str[i] != ';')
+      continue;
+    str[i] = 0;
+    return &str[i];
+  }
+  return NULL;
+}
+
+int main(int argc, const char **argv)
+{
+  unsigned char text[10000];
+  if (argc >= 2) {
+    if (loadText((String) argv[1], text, 10000) != 0)
+      exit(1);
+    run(text);
+    exit(0);
+  }
+
+  for (int nLines = 1;; ++nLines) {
+    printf("[%d]> ", nLines);
+    fgets(text, 10000, stdin);
+    int inputLen = strlen(text);
+    if (text[inputLen - 1] == '\n')
+      text[inputLen - 1] = 0;
+
+    String semicolonPos = removeTrailingSemicolon(text, inputLen - 1);
+    if (strcmp(text, "exit") == 0)
+      exit(0);
+    else if (strncmp(text, "run ", 4) == 0) {
+      if (loadText(&text[4], text, 10000) != 0)
+        continue;
+      run(text);
+    }
+    else {
+      if (semicolonPos)
+        *semicolonPos = ';';
+      run(text);
+    }
+  }
 }
