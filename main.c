@@ -1170,7 +1170,7 @@ void showHistory(int dir, char *buf)
 void saveHistory()
 {
   FILE *fp;
-  if (cmdHist.count > 0 && (fp = fopen(".haribote_history", "wt")) == NULL)
+  if (cmdHist.count == 0 || (fp = fopen(".haribote_history", "wt")) == NULL)
     return;
 
   int counter = cmdHist.count;
