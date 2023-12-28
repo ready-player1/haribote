@@ -352,6 +352,9 @@ char *readLine(char *str, int size, FILE *stream)
   char insertBuf[LINE_SIZE + 1] = "";
 
   while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
+    if (ch == 4) // Control-D
+      break;
+
     if (nInserted > 0 && (ch < 32 || ch == 127)) {
       memmove(&str[cursorX], &str[cursorX - nInserted], insertBuf[LINE_SIZE]);
       strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
@@ -491,13 +494,16 @@ int main(int argc, const char **argv)
   for (int next = 1, nLines = 0;;) {
     if (next)
       printf("[%d]> ", ++nLines);
-    readLine(text, LINE_SIZE, stdin);
+    if (readLine(text, LINE_SIZE, stdin) == NULL) {
+      printf("\n");
+      return 1;
+    }
     int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n')
-      text[inputLen - 1] = 0;
+      text[--inputLen] = 0;
 
     next = 1;
-    String semicolonPos = removeTrailingSemicolon(text, inputLen - 1);
+    String semicolonPos = removeTrailingSemicolon(text, inputLen);
     if (strcmp(text, "exit") == 0) {
       destroyTerm();
       exit(0);
