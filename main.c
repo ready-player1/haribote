@@ -1519,7 +1519,7 @@ void aMain()
       printf("[%d]> ", ++nLines);
     if (readLine(text, LINE_SIZE, stdin) == NULL) {
       printf("\n");
-      return 1;
+      exit(1);
     }
     int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n')
