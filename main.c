@@ -1349,14 +1349,14 @@ int main(int argc, const char **argv)
     exit(0);
   }
 
+  int status = 0;
   initTerm();
   for (int next = 1, nLines = 0;;) {
     if (next)
       printf("[%d]> ", ++nLines);
     if (readLine(text, LINE_SIZE, stdin) == NULL) {
       printf("\n");
-      destroyTerm();
-      exit(1);
+      goto exit;
     }
     int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n')
@@ -1364,10 +1364,8 @@ int main(int argc, const char **argv)
 
     next = 1;
     String semicolonPos = removeTrailingSemicolon(text, inputLen);
-    if (strcmp(text, "exit") == 0) {
-      destroyTerm();
-      exit(0);
-    }
+    if (strcmp(text, "exit") == 0)
+      goto exit;
 #if defined(__APPLE__) || defined(__linux__)
     else if (strcmp(text, "prevhist") == 0) {
       eraseLine();
@@ -1403,4 +1401,7 @@ int main(int argc, const char **argv)
       run(text);
     }
   }
+exit:
+  destroyTerm();
+  exit(status);
 }
