@@ -1519,6 +1519,7 @@ void aMain()
       printf("[%d]> ", ++nLines);
     if (readLine(text, LINE_SIZE, stdin) == NULL) {
       printf("\n");
+      destroyTerm();
       exit(1);
     }
     int inputLen = strlen(text);
