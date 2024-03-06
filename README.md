@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://github.com/ready-player1/haribote/blob/main/LICENSE)
 
-hariboteは、はりぼて言語の処理系です。HL-1からHL-9aまでの各バージョンのコミットを、それぞれのブランチに記録しています。
+hariboteは、はりぼて言語の処理系です。
 
 はりぼて言語は、川合秀実さんが開発しているプログラミング言語です。2021年に「[10日くらいでできる！プログラミング言語自作入門](http://essen.osask.jp/?a21_txt01)」で発表されました。
 
