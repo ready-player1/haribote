@@ -1033,7 +1033,7 @@ int compile(String src)
   return end - internalCodes;
 err:
   printf("Syntax error: %s %s %s %s\n", tokenStrs[tc[pc]], tokenStrs[tc[pc + 1]], tokenStrs[tc[pc + 2]], tokenStrs[tc[pc + 3]]);
-  return 1;
+  return -1;
 }
 
 AWindow *win;
