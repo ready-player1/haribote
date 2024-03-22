@@ -249,6 +249,7 @@ typedef enum {
   OpJge,
   OpJlt,
   OpJgt,
+  OpLop,
   OpTime,
   OpAdd1,
 } Opcode;
@@ -275,6 +276,9 @@ int compile(String src)
   for (pc = 0; pc < nTokens;) {
     if (match(0, "!!*0 = !!*1;", pc)) {
       putIc(OpCpy, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], 0, 0);
+    }
+    else if (match(10, "!!*0 = !!*1 + 1; if (!!*2 < !!*3) goto !!*4;", pc) && tc[wpc[0]] == tc[wpc[1]] && tc[wpc[0]] == tc[wpc[2]]) {
+      putIc(OpLop, &vars[tc[wpc[4]]], &vars[tc[wpc[0]]], &vars[tc[wpc[3]]], 0);
     }
     else if (match(9, "!!*0 = !!*1 + 1;", pc) && tc[wpc[0]] == tc[wpc[1]]) { // +1専用の命令
       putIc(OpAdd1, &vars[tc[wpc[0]]], 0, 0, 0);
@@ -314,7 +318,7 @@ int compile(String src)
   Opcode op;
   for (icp = internalCodes; icp < end; icp += 5) { // goto先の設定
     op = (Opcode) icp[0];
-    if (OpGoto <= op && op <= OpJgt)
+    if (OpGoto <= op && op <= OpLop)
       icp[1] = (IntPtr) (internalCodes + *icp[1]);
   }
   return end - internalCodes;
@@ -327,6 +331,7 @@ void exec()
 {
   clock_t begin = clock();
   icp = internalCodes;
+  int i;
   for (;;) {
     switch ((Opcode) icp[0]) {
     case OpEnd:
@@ -362,6 +367,16 @@ void exec()
       continue;
     case OpAdd1:
       ++(*icp[1]);
+      icp += 5;
+      continue;
+    case OpLop:
+      i = *icp[2];
+      ++i;
+      *icp[2] = i;
+      if (i < *icp[3]) {
+        icp = (IntPtr *) icp[1];
+        continue;
+      }
       icp += 5;
       continue;
     }
