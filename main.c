@@ -122,9 +122,9 @@ enum {
   PlusPlus,
   Equal,
   NotEq,
-  LesEq,
-  GtrEq,
   Les,
+  GtrEq,
+  LesEq,
   Gtr,
   Plus,
   Minus,
@@ -150,6 +150,10 @@ enum {
   Time,
   Goto,
   If,
+  Else,
+  For,
+  Continue,
+  Break,
 
   Wildcard,
   Expr,
@@ -184,9 +188,9 @@ String defaultTokens[] = {
   "++",
   "==",
   "!=",
-  "<=",
-  ">=",
   "<",
+  ">=",
+  "<=",
   ">",
   "+",
   "-",
@@ -212,6 +216,10 @@ String defaultTokens[] = {
   "time",
   "goto",
   "if",
+  "else",
+  "for",
+  "continue",
+  "break",
 
   "!!*",
   "!!**",
@@ -368,9 +376,9 @@ typedef enum {
   OpCpy,
   OpCeq,
   OpCne,
-  OpCle,
-  OpCge,
   OpClt,
+  OpCge,
+  OpCle,
   OpCgt,
   OpAdd,
   OpSub,
@@ -384,9 +392,9 @@ typedef enum {
   OpGoto,
   OpJeq,
   OpJne,
-  OpJle,
-  OpJge,
   OpJlt,
+  OpJge,
+  OpJle,
   OpJgt,
   OpLop,
   OpPrint,
@@ -545,6 +553,86 @@ int expression(int num)
   return res;
 }
 
+enum { ConditionIsTrue, ConditionIsFalse };
+
+// 条件式wpc[i]を評価して、その結果に応じてlabelに分岐する内部コードを生成する
+void ifgoto(int i, int not, int label)
+{
+  int begin = wpc[i];
+
+  if (begin + 3 == wpc[End_(i)] && Equal <= tc[begin + 1] && tc[begin + 1] <= Gtr) {
+    Opcode op = OpJeq + ((tc[begin + 1] - Equal) ^ not);
+    putIc(op, &vars[label], &vars[tc[begin]], &vars[tc[begin + 2]], 0);
+  }
+  else {
+    i = expression(i);
+    putIc(OpJne - not, &vars[label], &vars[i], &vars[Zero], 0);
+    tmpFree(i);
+  }
+}
+
+int tmpLabelNo;
+
+int tmpLabelAlloc()
+{
+  char str[10];
+  sprintf(str, "_l%d", tmpLabelNo);
+  ++tmpLabelNo;
+  return getTokenCode(str, strlen(str));
+}
+
+#define BLOCK_INFO_SIZE 10
+int blockInfo[BLOCK_INFO_SIZE * 100], blockDepth, loopDepth;
+
+enum { BlockType, IfBlock, ForBlock };
+enum { IfLabel0 = 1, IfLabel1 };
+enum { ForBegin = 1, ForContinue, ForBreak, ForDepth, ForWpc1, ForWpcEnd1, ForWpc2, ForWpcEnd2 };
+
+inline static int *initBlockInfo()
+{
+  blockDepth = loopDepth = 0;
+  return blockInfo;
+}
+
+inline static int *beginBlock()
+{
+  blockDepth += BLOCK_INFO_SIZE;
+  return &blockInfo[blockDepth];
+}
+
+inline static int *endBlock()
+{
+  blockDepth -= BLOCK_INFO_SIZE;
+  return &blockInfo[blockDepth];
+}
+
+inline static void startLoop(int **loopBlock)
+{
+  blockInfo[blockDepth + ForDepth] = loopDepth;
+  loopDepth = blockDepth;
+  *loopBlock = &blockInfo[loopDepth];
+}
+
+inline static void stopLoop(int **loopBlock)
+{
+  loopDepth = blockInfo[blockDepth + ForDepth];
+  *loopBlock = loopDepth == 0 ? NULL : &blockInfo[loopDepth];
+}
+
+inline static void saveExpr(int i)
+{
+  assert(blockInfo[blockDepth + BlockType] == ForBlock);
+  blockInfo[blockDepth + ForWpc1 - 2 + 2 * i] = wpc[i];
+  blockInfo[blockDepth + ForWpc1 - 2 + 2 * i + 1] = wpc[End_(i)];
+}
+
+inline static void restoreExpr(int i)
+{
+  assert(blockInfo[blockDepth + BlockType] == ForBlock);
+  wpc[i] = blockInfo[blockDepth + ForWpc1 - 2 + 2 * i];
+  wpc[End_(i)] = blockInfo[blockDepth + ForWpc1 - 2 + 2 * i + 1];
+}
+
 int compile(String src)
 {
   int nTokens = lexer(src, tc);
@@ -555,10 +643,12 @@ int compile(String src)
 
   for (int i = 0; i < N_TMPS; ++i)
     tmpFlags[i] = 0;
+  tmpLabelNo = 0;
+  int *curBlock = initBlockInfo(), *loopBlock = NULL;
 
   int pc;
   for (pc = 0; pc < nTokens;) {
-    int e0 = 0;
+    int e0 = 0, e2 = 0;
     if (match(0, "!!*0 = !!*1;", pc)) {
       putIc(OpCpy, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], 0, 0);
     }
@@ -582,13 +672,82 @@ int compile(String src)
       vars[tc[wpc[0]]] = icp - internalCodes; // ラベル名の変数にその時のicpの相対位置を入れておく
     }
     else if (match(5, "goto !!*0;", pc)) {
-      putIc(OpGoto, &vars[tc[wpc[0]]], 0, 0, 0);
+      putIc(OpGoto, &vars[tc[wpc[0]]], &vars[tc[wpc[0]]], 0, 0);
     }
-    else if (match(6, "if (!!*0 !!*1 !!*2) goto !!*3;", pc) && Equal <= tc[wpc[1]] && tc[wpc[1]] <= Gtr) {
-      putIc(OpJeq + (tc[wpc[1]] - Equal), &vars[tc[wpc[3]]], &vars[tc[wpc[0]]], &vars[tc[wpc[2]]], 0);
+    else if (match(6, "if (!!**0) goto !!*1;", pc)) {
+      ifgoto(0, ConditionIsTrue, tc[wpc[1]]);
     }
     else if (match(7, "time;", pc)) {
       putIc(OpTime, 0, 0, 0, 0);
+    }
+    else if (match(11, "if (!!**0) {", pc)) { // if文
+      curBlock = beginBlock();
+      curBlock[ BlockType ] = IfBlock;
+      curBlock[ IfLabel0  ] = tmpLabelAlloc(); // 条件不成立のときの飛び先
+      curBlock[ IfLabel1  ] = 0;
+      ifgoto(0, ConditionIsFalse, curBlock[IfLabel0]);
+    }
+    else if (match(13, "} else {", pc) && curBlock[BlockType] == IfBlock) {
+      curBlock[IfLabel1] = tmpLabelAlloc(); // else節の終端
+      putIc(OpGoto, &vars[curBlock[IfLabel1]], &vars[curBlock[IfLabel1]], 0, 0);
+      vars[curBlock[IfLabel0]] = icp - internalCodes;
+    }
+    else if (match(12, "}", pc) && curBlock[BlockType] == IfBlock) {
+      int ifLabel = curBlock[IfLabel1] ? IfLabel1 : IfLabel0;
+      vars[curBlock[ifLabel]] = icp - internalCodes;
+      curBlock = endBlock();
+    }
+    else if (match(14, "for (!!***0; !!***1; !!***2) {", pc)) { // for文
+      curBlock = beginBlock();
+      curBlock[ BlockType   ] = ForBlock;
+      curBlock[ ForBegin    ] = tmpLabelAlloc();
+      curBlock[ ForContinue ] = tmpLabelAlloc();
+      curBlock[ ForBreak    ] = tmpLabelAlloc();
+      startLoop(&loopBlock);
+
+      e0 = expression(0);
+      saveExpr(1);
+      if (wpc[1] < wpc[End_(1)])
+        ifgoto(1, ConditionIsFalse, curBlock[ForBreak]);
+      saveExpr(2);
+      vars[curBlock[ForBegin]] = icp - internalCodes;
+    }
+    else if (match(12, "}", pc) && curBlock[BlockType] == ForBlock) {
+      vars[curBlock[ForContinue]] = icp - internalCodes;
+
+      restoreExpr(1);
+      restoreExpr(2);
+      int begin1 = wpc[1], end1 = wpc[End_(1)], begin2 = wpc[2], end2 = wpc[End_(2)];
+      int shouldOptimize =
+        begin1 + 3 == end1 && tc[begin1 + 1] == Les && begin2 + 2 == end2 &&
+        (tc[begin1] == tc[begin2] && tc[begin2 + 1] == PlusPlus ||
+         tc[begin1] == tc[begin2 + 1] && tc[begin2] == PlusPlus);
+
+      if (shouldOptimize)
+        putIc(OpLop, &vars[curBlock[ForBegin]], &vars[tc[begin1]], &vars[tc[begin1 + 2]], 0);
+      else {
+        e2 = expression(2);
+        if (begin1 < end1)
+          ifgoto(1, ConditionIsTrue, curBlock[ForBegin]);
+        else
+          putIc(OpGoto, &vars[curBlock[ForBegin]], &vars[curBlock[ForBegin]], 0, 0);
+      }
+      vars[curBlock[ForBreak]] = icp - internalCodes;
+
+      stopLoop(&loopBlock);
+      curBlock = endBlock();
+    }
+    else if (match(15, "continue;", pc) && loopBlock) {
+      putIc(OpGoto, &vars[loopBlock[ForContinue]], &vars[loopBlock[ForContinue]], 0, 0);
+    }
+    else if (match(16, "break;", pc) && loopBlock) {
+      putIc(OpGoto, &vars[loopBlock[ForBreak]], &vars[loopBlock[ForBreak]], 0, 0);
+    }
+    else if (match(17, "if (!!**0) continue;", pc) && loopBlock) {
+      ifgoto(0, ConditionIsTrue, loopBlock[ForContinue]);
+    }
+    else if (match(18, "if (!!**0) break;", pc) && loopBlock) {
+      ifgoto(0, ConditionIsTrue, loopBlock[ForBreak]);
     }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
@@ -597,18 +756,27 @@ int compile(String src)
       goto err;
     }
     tmpFree(e0);
-    if (e0 < 0)
+    tmpFree(e2);
+    if (e0 < 0 || e2 < 0)
       goto err;
     pc = nextPc;
   }
+  if (blockDepth > 0) {
+    printf("Block nesting error: blockDepth=%d loopDepth=%d", blockDepth, loopDepth);
+    return -1;
+  }
   putIc(OpEnd, 0, 0, 0, 0);
 
-  IntPtr *end = icp;
+  IntPtr *end = icp, *tmpDest;
   Opcode op;
   for (icp = internalCodes; icp < end; icp += 5) { // goto先の設定
     op = (Opcode) icp[0];
-    if (OpGoto <= op && op <= OpLop)
-      icp[1] = (IntPtr) (internalCodes + *icp[1]);
+    if (OpGoto <= op && op <= OpLop) {
+      tmpDest = internalCodes + *icp[1];
+      while ((Opcode) tmpDest[0] == OpGoto) // goto先がOpGotoのときは、さらにその先を読む
+        tmpDest = internalCodes + *tmpDest[2];
+      icp[1] = (IntPtr) tmpDest;
+    }
   }
   return end - internalCodes;
 err:
