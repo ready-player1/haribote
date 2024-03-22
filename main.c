@@ -6,11 +6,7 @@
   designed in 2021 by Hidemi Kawai.
   https://essen.osask.jp/?a21_txt01
 */
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <time.h>
+#include <acl.c>
 #include <assert.h>
 #if defined(__APPLE__) || defined(__linux__)
 #include <unistd.h>
@@ -47,7 +43,7 @@ int loadText(String path, String text, int size)
 String tokenStrs[MAX_TOKEN_CODE + 1];
 int    tokenLens[MAX_TOKEN_CODE + 1];
 
-intptr_t vars[MAX_TOKEN_CODE + 1];
+AInt vars[MAX_TOKEN_CODE + 1];
 
 int getTokenCode(String str, int len)
 {
@@ -78,7 +74,7 @@ int getTokenCode(String str, int len)
         printf("Failed to allocate memory\n");
         exit(1);
       }
-      vars[i] = (intptr_t) p;
+      vars[i] = (AInt) p;
       memcpy(p, tokenStrs[i] + 1, len - 2); // 手抜き実装（エスケープシーケンスを処理していない）
       p[len - 2] = 0;
     }
@@ -392,7 +388,7 @@ int match(int id, String phrase, int pc)
   return 1;
 }
 
-typedef intptr_t *IntPtr;
+typedef AInt *IntPtr;
 
 IntPtr internalCodes[10000]; // ソースコードをコンパイルして生成した内部コードを格納する
 IntPtr *icp;
@@ -432,6 +428,20 @@ typedef enum {
   OpAryGet,
   OpArySet,
   OpPrm,
+  OpOpnWin,
+  OpSetPix0,
+  OpM64s,
+  OpRgb8,
+  OpWait,
+  OpXorShift,
+  OpGetPix,
+  OpFilRct0,
+  OpF16Sin,
+  OpF16Cos,
+  OpInkey,
+  OpDrwStr0,
+  OpGprDec,
+  OpBitBlt,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -469,6 +479,7 @@ int epc, epcEnd; // expression()のためのpc, その式の直後のトーク�
 
 int evalExpression(Precedence precedence);
 int expression(int num);
+int exprsPutIc(int times, Opcode op, int tmpReg, int *err);
 
 inline static Opcode getOpcode(int i) // for infix operators
 {
@@ -520,6 +531,31 @@ int evalExpression(Precedence precedence)
     e0 = evalExpression(getPrecedence(Prefix, Ex));
     res = tmpAlloc();
     putIc(OpNot, &vars[res], &vars[e0], 0, 0);
+  }
+  else if (match(74, "mul64shr(!!**1, !!**2, !!**3)", epc)) {
+    res = exprsPutIc(4, OpM64s, tmpAlloc(), &e0);
+  }
+  else if (match(75, "aRgb8(!!**1, !!**2, !!**3)", epc)) {
+    res = exprsPutIc(4, OpRgb8, tmpAlloc(), &e0);
+  }
+  else if (match(76, "aOpenWin(!!**0, !!**1, !!***2, !!***8)", epc)) {
+    exprsPutIc(3, OpOpnWin, 0, &e0);
+    res = Zero;
+  }
+  else if (match(77, "aXorShift32()", epc)) {
+    res = exprsPutIc(1, OpXorShift, tmpAlloc(), &e0);
+  }
+  else if (match(78, "aGetPix(!!**8, !!**1, !!**2)", epc)) {
+    res = exprsPutIc(3, OpGetPix, tmpAlloc(), &e0);
+  }
+  else if (match(79, "ff16sin(!!**1)", epc)) {
+    res = exprsPutIc(2, OpF16Sin, tmpAlloc(), &e0);
+  }
+  else if (match(80, "ff16cos(!!**1)", epc)) {
+    res = exprsPutIc(2, OpF16Cos, tmpAlloc(), &e0);
+  }
+  else if (match(81, "aInkey(!!***8, !!**1)", epc)) {
+    res = exprsPutIc(2, OpInkey, tmpAlloc(), &e0);
   }
   else { // 変数もしくは定数
     res = tc[epc];
@@ -905,7 +941,7 @@ int compile(String src)
         if (tc[pc] != Comma)
           ++nElems;
       }
-      intptr_t *ary = malloc(nElems * sizeof(intptr_t));
+      AInt *ary = malloc(nElems * sizeof(AInt));
       if (ary == NULL) {
         printf("Failed to allocate memory\n");
         exit(1);
@@ -920,6 +956,24 @@ int compile(String src)
       }
       putIc(OpAryInit, &vars[tc[wpc[0]]], (IntPtr) ary, (IntPtr) nElems, 0);
       nextPc = pc + 2; // } と ; の分
+    }
+    else if (match(23, "aSetPix0(!!***8, !!**0, !!**1, !!**2);", pc)) {
+      exprsPutIc(3, OpSetPix0, 0, &e0);
+    }
+    else if (match(24, "aWait(!!**0);", pc)) {
+      exprsPutIc(1, OpWait, 0, &e0);
+    }
+    else if (match(25, "aFillRect0(!!***8, !!**0, !!**1, !!**2, !!**3, !!**4);", pc)) {
+      exprsPutIc(5, OpFilRct0, 0, &e0);
+    }
+    else if (match(26, "aDrawStr0(!!***8, !!**0, !!**1, !!**2, !!**3, !!**4);", pc)) {
+      exprsPutIc(5, OpDrwStr0, 0, &e0);
+    }
+    else if (match(27, "gprintDec(!!***8, !!**0, !!**1, !!**2, !!**3, !!**4, !!**5);", pc)) {
+      exprsPutIc(6, OpGprDec, 0, &e0);
+    }
+    else if (match(28, "bitblt(!!***8, !!**0, !!**1, !!**2, !!**3, !!**4);", pc)) {
+      exprsPutIc(5, OpBitBlt, 0, &e0);
     }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
@@ -956,14 +1010,20 @@ err:
   return -1;
 }
 
+AWindow *win;
+
 void exec()
 {
   clock_t begin = clock();
   icp = internalCodes;
-  intptr_t i, *obj;
+  AInt i, j, *obj, sx, sy;
+  AInt32 *p32;
+  char str[100];
   for (;;) {
     switch ((Opcode) icp[0]) {
     case OpEnd:
+      if (win != NULL)
+        aFlushAll(win);
       return;
     case OpNeg:   *icp[1] = -*icp[2];           icp += 5; continue;
     case OpNot:   *icp[1] = !*icp[2];           icp += 5; continue;
@@ -1012,26 +1072,26 @@ void exec()
       icp += 5;
       continue;
     case OpAryNew:
-      *icp[1] = (intptr_t) malloc(*icp[2] * sizeof(intptr_t));
-      if (*icp[1] == (intptr_t) NULL) {
+      *icp[1] = (AInt) malloc(*icp[2] * sizeof(AInt));
+      if (*icp[1] == (AInt) NULL) {
         printf("Failed to allocate memory\n");
         exit(1);
       }
-      memset((char *) *icp[1], 0, *icp[2] * sizeof(intptr_t));
+      memset((char *) *icp[1], 0, *icp[2] * sizeof(AInt));
       icp += 5;
       continue;
     case OpAryInit:
-      memcpy((char *) *icp[1], (char *) icp[2], ((int) icp[3]) * sizeof(intptr_t));
+      memcpy((char *) *icp[1], (char *) icp[2], ((int) icp[3]) * sizeof(AInt));
       icp += 5;
       continue;
     case OpArySet:
-      obj = (intptr_t *) *icp[1];
+      obj = (AInt *) *icp[1];
       i = *icp[2];
       obj[i] = *icp[3];
       icp += 5;
       continue;
     case OpAryGet:
-      obj = (intptr_t *) *icp[1];
+      obj = (AInt *) *icp[1];
       i = *icp[2];
       *icp[3] = obj[i];
       icp += 5;
@@ -1040,6 +1100,84 @@ void exec()
       printf("%s:%s:%d: ", __FILE__, __FUNCTION__, __LINE__);
       printf("Should not reach here\n");
       exit(1);
+    case OpOpnWin:
+      if (win != NULL) {
+        if (win->xsiz < *icp[1] || win->ysiz < *icp[2]) {
+          printf("OpenWin error\n");
+          return;
+        }
+      }
+      else
+        win = aOpenWin(*icp[1], *icp[2], (char *) *icp[3], 0);
+      icp += 5;
+      continue;
+    case OpSetPix0:
+      aSetPix0(win, *icp[1], *icp[2], *icp[3]);
+      icp += 5;
+      continue;
+    case OpM64s:
+      *icp[1] = (((AInt64) *icp[2]) * ((AInt64) *icp[3])) >> *icp[4];
+      icp += 5;
+      continue;
+    case OpRgb8:
+      *icp[1] = aRgb8(*icp[2], *icp[3], *icp[4]);
+      icp += 5;
+      continue;
+    case OpWait:
+      if (*icp[1] == -1) {
+        if (win != NULL)
+          aFlushAll(win);
+        return;
+      }
+      aWait(*icp[1]);
+      icp += 5;
+      continue;
+    case OpXorShift:
+      *icp[1] = aXorShift32();
+      icp += 5;
+      continue;
+    case OpGetPix:
+      *icp[1] = aGetPix(win, *icp[2], *icp[3]);
+      icp += 5;
+      continue;
+    case OpFilRct0:
+      aFillRect0(win, *icp[1], *icp[2], *icp[3], *icp[4], *icp[6]);
+      icp += 10;
+      continue;
+    case OpF16Sin:
+      *icp[1] = (AInt) (sin(*icp[2] * (2 * 3.14159265358979323 / 65536)) * 65536);
+      icp += 5;
+      continue;
+    case OpF16Cos:
+      *icp[1] = (AInt) (cos(*icp[2] * (2 * 3.14159265358979323 / 65536)) * 65536);
+      icp += 5;
+      continue;
+    case OpInkey:
+      *icp[1] = aInkey(win, *icp[2]);
+      icp += 5;
+      continue;
+    case OpDrwStr0:
+      aDrawStr0(win, *icp[1], *icp[2], *icp[3], *icp[4], (char *) *icp[6]);
+      icp += 10;
+      continue;
+    case OpGprDec:
+      sprintf(str, "%*d", *icp[3], *icp[7]);
+      aDrawStr0(win, *icp[1], *icp[2], *icp[4], *icp[6], str);
+      icp += 10;
+      continue;
+    case OpBitBlt:
+      obj = (AInt *) *icp[6];
+      p32 = &win->buf[ *icp[3] + *icp[4] * win->xsiz ];
+      sx = *icp[1];
+      sy = *icp[2];
+      for (j = 0; j < sy; ++j) {
+        for (i = 0; i < sx; ++i)
+          p32[i] = obj[i];
+        obj += sx;
+        p32 += win->xsiz;
+      }
+      icp += 10;
+      continue;
     }
   }
 }
@@ -1338,12 +1476,12 @@ char *readLine(char *str, int size, FILE *stream)
 #define readLine fgets
 #endif
 
-int main(int argc, const char **argv)
+void aMain()
 {
   unsigned char text[10000];
   initTc(defaultTokens, sizeof defaultTokens / sizeof defaultTokens[0]);
-  if (argc >= 2) {
-    if (loadText((String) argv[1], text, 10000) != 0)
+  if (aArgc >= 2) {
+    if (loadText((String) aArgv[1], text, 10000) != 0)
       exit(1);
     run(text);
     exit(0);
