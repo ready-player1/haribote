@@ -1536,14 +1536,12 @@ void aMain()
       printf("[%d]> ", nLines);
       showHistory(Prev, text);
       next = 0;
-      continue;
     }
     else if (strcmp(text, "nexthist") == 0) {
       eraseLine();
       printf("[%d]> ", nLines);
       showHistory(Next, text);
       next = 0;
-      continue;
     }
 #endif
     else if (strncmp(text, "run ", 4) == 0) {
@@ -1556,7 +1554,6 @@ void aMain()
       eraseAll();
       printf("[%d]> ", nLines);
       next = 0;
-      continue;
     }
 #endif
     else {
