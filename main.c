@@ -525,18 +525,18 @@ int evalExpression(Precedence precedence)
   }
   else if (tc[epc] == PlusPlus) { // 前置インクリメント
     ++epc;
-    res = evalExpression(getPrecedence(Prefix, PlusPlus));
+    res = evalExpression(Prefix_PlusPlus);
     putIc(OpAdd1, &vars[res], 0, 0, 0);
   }
   else if (tc[epc] == Minus) { // 単項マイナス
     ++epc;
-    e0 = evalExpression(getPrecedence(Prefix, Minus));
+    e0 = evalExpression(Prefix_Minus);
     res = tmpAlloc();
     putIc(OpNeg, &vars[res], &vars[e0], 0, 0);
   }
   else if (tc[epc] == Ex) { // 論理否定
     ++epc;
-    e0 = evalExpression(getPrecedence(Prefix, Ex));
+    e0 = evalExpression(Prefix_Ex);
     res = tmpAlloc();
     putIc(OpNot, &vars[res], &vars[e0], 0, 0);
   }
@@ -603,7 +603,7 @@ int evalExpression(Precedence precedence)
       e1 = res;
       e0 = expression(0);
       epc = nextPc;
-      res = evalExpression(getPrecedence(Infix, Assign));
+      res = evalExpression(Infix_Assign);
       putIc(OpArySet, &vars[e1], &vars[e0], &vars[res], 0);
     }
     else if (match(71, "[!!**0]", epc)) {
