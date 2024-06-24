@@ -340,7 +340,7 @@ int phraseTc[(MAX_PHRASE_LEN + 1) * 100]; // フレーズを字句解析して�
 int wpc[N_WILDCARDS * 2]; // ワイルドカードにマッチしたトークンを指す
 int nextPc; // マッチしたフレーズの末尾の次のトークンを指す
 
-inline static int End_(int num)
+inline static int _end(int num)
 {
   return N_WILDCARDS + num;
 }
@@ -381,7 +381,7 @@ int match(int id, String phrase, int pc)
           break;
         ++pc;
       }
-      wpc[End_(num)] = pc; // 式の終了位置
+      wpc[_end(num)] = pc; // 式の終了位置
       if (phraTc == Expr && wpc[num] == pc)
         return 0;
       if (depth > 0)
@@ -648,7 +648,7 @@ int evalExpression(Precedence precedence)
 // 引数として渡したワイルドカード番号にマッチした式をコンパイルしてinternalCodes[]に書き込む
 int expression(int num)
 {
-  if (wpc[num] == wpc[End_(num)])
+  if (wpc[num] == wpc[_end(num)])
     return 0;
 
   int i, end = N_WILDCARDS * 2, buf[end + 1];
@@ -657,7 +657,7 @@ int expression(int num)
   buf[i] = nextPc;
   int oldEpc = epc, oldEpcEnd = epcEnd;
 
-  epc = wpc[num]; epcEnd = wpc[End_(num)];
+  epc = wpc[num]; epcEnd = wpc[_end(num)];
   int res = evalExpression(LowestPrecedence);
   if (epc < epcEnd)
     return -1;
@@ -676,7 +676,7 @@ void ifgoto(int i, int not, int label)
 {
   int begin = wpc[i];
 
-  if (begin + 3 == wpc[End_(i)] && Equal <= tc[begin + 1] && tc[begin + 1] <= Gtr) {
+  if (begin + 3 == wpc[_end(i)] && Equal <= tc[begin + 1] && tc[begin + 1] <= Gtr) {
     Opcode op = OpJeq + ((tc[begin + 1] - Equal) ^ not);
     putIc(op, &vars[label], &vars[tc[begin]], &vars[tc[begin + 2]], 0);
   }
@@ -752,7 +752,7 @@ inline static void saveExpr(int i)
   }
 #endif
   blockInfo[blockDepth + head + 2 * i] = wpc[i];
-  blockInfo[blockDepth + head + 2 * i + 1] = wpc[End_(i)];
+  blockInfo[blockDepth + head + 2 * i + 1] = wpc[_end(i)];
 }
 
 inline static void restoreExpr(int i)
@@ -772,7 +772,7 @@ inline static void restoreExpr(int i)
   }
 #endif
   wpc[i] = blockInfo[blockDepth + head + 2 * i];
-  wpc[End_(i)] = blockInfo[blockDepth + head + 2 * i + 1];
+  wpc[_end(i)] = blockInfo[blockDepth + head + 2 * i + 1];
 }
 
 int exprsPutIc(int times, Opcode op, int tmpReg, int *err)
@@ -867,7 +867,7 @@ int compile(String src)
 
       e0 = expression(0);
       saveExpr(1);
-      if (wpc[1] < wpc[End_(1)])
+      if (wpc[1] < wpc[_end(1)])
         ifgoto(1, ConditionIsFalse, curBlock[LoopBreak]);
       saveExpr(2);
       vars[curBlock[LoopBegin]] = icp - internalCodes;
@@ -877,7 +877,7 @@ int compile(String src)
 
       restoreExpr(1);
       restoreExpr(2);
-      int begin1 = wpc[1], end1 = wpc[End_(1)], begin2 = wpc[2], end2 = wpc[End_(2)];
+      int begin1 = wpc[1], end1 = wpc[_end(1)], begin2 = wpc[2], end2 = wpc[_end(2)];
       int shouldOptimize =
         begin1 + 3 == end1 && tc[begin1 + 1] == Les && begin2 + 2 == end2 &&
         (tc[begin1] == tc[begin2] && tc[begin2 + 1] == PlusPlus ||
