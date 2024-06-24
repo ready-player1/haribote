@@ -1275,8 +1275,8 @@ char *readLine(char *str, int size, FILE *stream)
       switch (ch) {
       case 67: if (cursorX < i) { write(0, "\e[C", 3); ++cursorX; } continue; // RightArrow
       case 68: if (cursorX > 0) { write(0, "\e[D", 3); --cursorX; } continue; // LeftArrow
-      case 65: strncpy(str, "prevhist", 9); break; // UpArrow
-      case 66: strncpy(str, "nexthist", 9); break; // DownArrow
+      case 65: strncpy(str, "__PREV_HIST", 12); break; // UpArrow
+      case 66: strncpy(str, "__NEXT_HIST", 12); break; // DownArrow
       }
       setCanonicalMode();
       return str;
@@ -1367,13 +1367,13 @@ int main(int argc, const char **argv)
     if (strcmp(text, "exit") == 0)
       goto exit;
 #if defined(__APPLE__) || defined(__linux__)
-    else if (strcmp(text, "prevhist") == 0) {
+    else if (strcmp(text, "__PREV_HIST") == 0) {
       eraseLine();
       printf("[%d]> ", nLines);
       showHistory(Prev, text);
       next = 0;
     }
-    else if (strcmp(text, "nexthist") == 0) {
+    else if (strcmp(text, "__NEXT_HIST") == 0) {
       eraseLine();
       printf("[%d]> ", nLines);
       showHistory(Next, text);
