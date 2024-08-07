@@ -960,7 +960,7 @@ void exec()
 {
   clock_t begin = clock();
   icp = internalCodes;
-  intptr_t i, *obj;
+  intptr_t i, *a;
   for (;;) {
     switch ((Opcode) icp[0]) {
     case OpEnd:
@@ -1025,15 +1025,15 @@ void exec()
       icp += 5;
       continue;
     case OpArySet:
-      obj = (intptr_t *) *icp[1];
+      a = (intptr_t *) *icp[1];
       i = *icp[2];
-      obj[i] = *icp[3];
+      a[i] = *icp[3];
       icp += 5;
       continue;
     case OpAryGet:
-      obj = (intptr_t *) *icp[1];
+      a = (intptr_t *) *icp[1];
       i = *icp[2];
-      *icp[3] = obj[i];
+      *icp[3] = a[i];
       icp += 5;
       continue;
     case OpPrm:
