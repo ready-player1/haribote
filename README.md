@@ -100,6 +100,6 @@ $ git checkout hist
 $ git log -p
 ```
 
-### Commits on Jun 24, 2024
+### Commits on Aug 7, 2024
 
 gitを使わなくても利用できるように、各バージョンのソースコードを[ブログ](https://masahiro-oono.hatenadiary.com/archive/category/haribote)に置いています。
