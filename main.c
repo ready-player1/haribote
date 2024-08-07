@@ -1042,7 +1042,7 @@ void exec()
 {
   clock_t begin = clock();
   icp = internalCodes;
-  AInt i, j, *obj, sx, sy;
+  AInt i, j, *a, sx, sy;
   AInt32 *p32;
   char str[100];
   for (;;) {
@@ -1111,15 +1111,15 @@ void exec()
       icp += 5;
       continue;
     case OpArySet:
-      obj = (AInt *) *icp[1];
+      a = (AInt *) *icp[1];
       i = *icp[2];
-      obj[i] = *icp[3];
+      a[i] = *icp[3];
       icp += 5;
       continue;
     case OpAryGet:
-      obj = (AInt *) *icp[1];
+      a = (AInt *) *icp[1];
       i = *icp[2];
-      *icp[3] = obj[i];
+      *icp[3] = a[i];
       icp += 5;
       continue;
     case OpPrm:
@@ -1192,14 +1192,14 @@ void exec()
       icp += 10;
       continue;
     case OpBitBlt:
-      obj = (AInt *) *icp[6];
+      a = (AInt *) *icp[6];
       p32 = &win->buf[ *icp[3] + *icp[4] * win->xsiz ];
       sx = *icp[1];
       sy = *icp[2];
       for (j = 0; j < sy; ++j) {
         for (i = 0; i < sx; ++i)
-          p32[i] = obj[i];
-        obj += sx;
+          p32[i] = a[i];
+        a += sx;
         p32 += win->xsiz;
       }
       icp += 10;
