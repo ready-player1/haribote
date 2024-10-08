@@ -102,4 +102,4 @@ $ git log -p
 
 ### Commits on Aug 7, 2024
 
-gitを使わなくても利用できるように、各バージョンのソースコードを[ブログ](https://masahiro-oono.hatenadiary.com/archive/category/haribote)に置いています。
+gitを使わなくても利用できるように、各バージョンのソースコードと、簡単な説明文を[ブログ](https://masahiro-oono.hatenadiary.com/archive/category/haribote)に置いています。
