@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 typedef unsigned char *String;
 
@@ -111,18 +112,34 @@ int main(int argc, const char **argv)
   unsigned char text[10000];
   loadText(argc, argv, text, 10000);
 
+  int equal     = getTokenCode("==", 2);
+  int notEq     = getTokenCode("!=", 2);
+  int lesEq     = getTokenCode("<=", 2);
+  int gtrEq     = getTokenCode(">=", 2);
+  int les       = getTokenCode("<", 1);
+  int gtr       = getTokenCode(">", 1);
+  int lparen    = getTokenCode("(", 1);
+  int rparen    = getTokenCode(")", 1);
   int plus      = getTokenCode("+", 1);
   int minus     = getTokenCode("-", 1);
   int period    = getTokenCode(".", 1);
   int semicolon = getTokenCode(";", 1);
+  int colon     = getTokenCode(":", 1);
   int assign    = getTokenCode("=", 1);
   int print     = getTokenCode("print", 5);
+  int time      = getTokenCode("time", 4);
+  int _goto     = getTokenCode("goto", 4);
+  int _if       = getTokenCode("if", 2);
 
   int nTokens = lexer(text, tc);
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
 
   int pc;
-  for (pc = 0; pc < nTokens; ++pc) {
+  for (pc = 0; pc < nTokens; ++pc) { // ラベル定義命令を探して位置を登録
+    if (tc[pc + 1] == colon)
+      vars[tc[pc]] = pc + 2; // ラベル定義命令の次のpc値を変数に記憶させておく
+  }
+  for (pc = 0; pc < nTokens;) {
     if (tc[pc + 1] == assign && tc[pc + 3] == semicolon)
       vars[tc[pc]] = vars[tc[pc + 2]];
     else if (tc[pc + 1] == assign && tc[pc + 3] == plus && tc[pc + 5] == semicolon)
@@ -131,11 +148,32 @@ int main(int argc, const char **argv)
       vars[tc[pc]] = vars[tc[pc + 2]] - vars[tc[pc + 4]];
     else if (tc[pc] == print && tc[pc + 2] == semicolon)
       printf("%d\n", vars[tc[pc + 1]]);
+    else if (tc[pc + 1] == colon) { // ラベル定義命令
+      pc += 2; // 読み飛ばす
+      continue;
+    }
+    else if (tc[pc] == _goto && tc[pc + 2] == semicolon) {
+      pc = vars[tc[pc + 1]];
+      continue;
+    }
+    else if (tc[pc] == _if && tc[pc + 1] == lparen && tc[pc + 5] == rparen && tc[pc + 6] == _goto && tc[pc + 8] == semicolon) {
+      int lhs = vars[tc[pc + 2]], op = tc[pc + 3], rhs = vars[tc[pc + 4]];
+      int dest = vars[tc[pc + 7]];
+      if (op == equal && lhs == rhs) { pc = dest; continue; }
+      if (op == notEq && lhs != rhs) { pc = dest; continue; }
+      if (op == lesEq && lhs <= rhs) { pc = dest; continue; }
+      if (op == gtrEq && lhs >= rhs) { pc = dest; continue; }
+      if (op == les   && lhs <  rhs) { pc = dest; continue; }
+      if (op == gtr   && lhs >  rhs) { pc = dest; continue; }
+    }
+    else if (tc[pc] == time && tc[pc + 1] == semicolon)
+      printf("time: %.3f[sec]\n", clock() / (double) CLOCKS_PER_SEC);
     else
       goto err;
 
     while (tc[pc] != semicolon)
       ++pc;
+    ++pc; // セミコロンを読み飛ばす
   }
   exit(0);
 err:
