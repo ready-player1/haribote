@@ -1386,7 +1386,7 @@ char *readLine(char *str, int size, FILE *stream)
       if (cursorX == 0)
         continue;
 
-      write(0, "\e[D\e[K", 6);
+      write(1, "\e[D\e[K", 6);
       if (cursorX < i) {
         str[i] = 0;
         printf("\e7%s\e8", &str[cursorX + nDeleted]);
@@ -1437,8 +1437,8 @@ char *readLine(char *str, int size, FILE *stream)
       if ((ch = fgetc(stream)) == EOF)
         break;
       switch (ch) {
-      case 67: if (cursorX < i) { write(0, "\e[C", 3); ++cursorX; } continue; // RightArrow
-      case 68: if (cursorX > 0) { write(0, "\e[D", 3); --cursorX; } continue; // LeftArrow
+      case 67: if (cursorX < i) { write(1, "\e[C", 3); ++cursorX; } continue; // RightArrow
+      case 68: if (cursorX > 0) { write(1, "\e[D", 3); --cursorX; } continue; // LeftArrow
       case 65: strncpy(str, "__PREV_HIST", 12); break; // UpArrow
       case 66: strncpy(str, "__NEXT_HIST", 12); break; // DownArrow
       }
@@ -1447,13 +1447,13 @@ char *readLine(char *str, int size, FILE *stream)
     }
     else if (ch == 6) { // Control-F
       if (cursorX < i) {
-        write(0, "\e[C", 3);
+        write(1, "\e[C", 3);
         ++cursorX;
       }
     }
     else if (ch == 2) { // Control-B
       if (cursorX > 0) {
-        write(0, "\e[D", 3);
+        write(1, "\e[D", 3);
         --cursorX;
       }
     }
@@ -1479,7 +1479,7 @@ char *readLine(char *str, int size, FILE *stream)
       cursorX = 0;
     }
     else if (ch == 11) { // Control-K
-      write(0, "\e[K", 3);
+      write(1, "\e[K", 3);
       str[cursorX] = 0;
       i -= i - cursorX;
     }
