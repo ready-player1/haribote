@@ -430,6 +430,16 @@ char *readLine(char *str, int size, FILE *stream)
       }
       if ((ch = fgetc(stream)) == EOF)
         break;
+      if (ch == 51) { // Forward Delete
+        if ((ch = fgetc(stream)) == EOF)
+          break;
+        else if (ch != 126) // ~
+          break;
+        if (cursorX == i)
+          continue;
+        // Implement if needed
+        continue;
+      }
       switch (ch) {
       case 67: if (cursorX < i) { write(1, "\e[C", 3); ++cursorX; } continue; // RightArrow
       case 68: if (cursorX > 0) { write(1, "\e[D", 3); --cursorX; } continue; // LeftArrow
