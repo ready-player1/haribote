@@ -1219,22 +1219,32 @@ char *readLine(char *str, int size, FILE *stream)
       insertBuf[0] = nInserted = 0;
     }
     if (ch == 8 || ch == 127) { // Backspace or Delete
-      if (cursorX == 0)
-        continue;
+      while (ch == 8 || ch == 127) {
+        if (cursorX == 0)
+          break;
 
-      write(1, "\e[D\e[K", 6);
-      if (cursorX < i) {
-        str[i] = 0;
-        printf("\e7%s\e8", &str[cursorX + nDeleted]);
+        write(1, "\e[D\e[K", 6);
+        if (cursorX < i) {
+          str[i] = 0;
+          printf("\e7%s\e8", &str[cursorX + nDeleted]);
+        }
+        --cursorX;
+        ++nDeleted;
+
+        if ((ch = fgetc(stream)) == EOF)
+          break;
       }
-      --cursorX;
-      ++nDeleted;
+      if (ch == EOF)
+        break;
+
+      if (nDeleted > 0) {
+        memmove(&str[cursorX], &str[cursorX + nDeleted], i - cursorX - nDeleted);
+        i -= nDeleted;
+        str[i] = nDeleted = 0;
+      }
+      if (cursorX > 0)
+        ungetc(ch, stream);
       continue;
-    }
-    else if (nDeleted > 0) {
-      memmove(&str[cursorX], &str[cursorX + nDeleted], i - cursorX - nDeleted);
-      i -= nDeleted;
-      str[i] = nDeleted = 0;
     }
     if (ch >= 32) { // printable characters
       putchar(ch);
