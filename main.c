@@ -1405,10 +1405,18 @@ char *readLine(char *str, int size, FILE *stream)
         strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
         insertBuf[0] = nInserted = 0;
       }
-      ungetc(ch, stream);
-      continue;
     }
-    if (ch == 8 || ch == 127) { // Backspace or Delete
+
+    if (ch == '\n') {
+      putchar(ch);
+      str[i] = ch; str[i + 1] = 0;
+      setHistory(str, i);
+      cmdHist.pos = 0;
+      cursorX = 0;
+      setCanonicalMode();
+      return str;
+    }
+    else if (ch == 8 || ch == 127) { // Backspace or Delete
       while (ch == 8 || ch == 127) {
         if (cursorX == 0)
           break;
@@ -1434,17 +1442,6 @@ char *readLine(char *str, int size, FILE *stream)
       }
       if (cursorX > 0)
         ungetc(ch, stream);
-      continue;
-    }
-
-    if (ch == '\n') {
-      putchar(ch);
-      str[i] = ch; str[i + 1] = 0;
-      setHistory(str, i);
-      cmdHist.pos = 0;
-      cursorX = 0;
-      setCanonicalMode();
-      return str;
     }
     else if (ch == 27) { // escape sequence
       if ((ch = fgetc(stream)) == EOF)
