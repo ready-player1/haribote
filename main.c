@@ -1276,7 +1276,9 @@ char *readLine(char *str, int size, FILE *stream)
         i -= nDeleted;
         str[i] = nDeleted = 0;
       }
-      if (cursorX > 0)
+      if (cursorX == 0 && (ch == 8 || ch == 127))
+        ;
+      else
         ungetc(ch, stream);
     }
     else if (ch == 27) { // escape sequence
