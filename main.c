@@ -1377,10 +1377,36 @@ char *readLine(char *str, int size, FILE *stream)
     if (ch == 4) // Control-D
       break;
 
-    if (nInserted > 0 && (ch < 32 || ch == 127)) {
-      memmove(&str[cursorX], &str[cursorX - nInserted], insertBuf[LINE_SIZE]);
-      strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
-      insertBuf[0] = nInserted = 0;
+    if (ch >= 32 && ch != 127) { // printable characters
+      while (ch >= 32 && ch != 127) {
+        putchar(ch);
+        if (cursorX < i) {
+          if (nInserted == 0) {
+            insertBuf[LINE_SIZE] = i - cursorX;
+            str[i] = 0;
+          }
+          printf("\e7%s\e8", &str[cursorX - nInserted]);
+          insertBuf[nInserted] = ch;
+          ++nInserted;
+        }
+        else
+          str[cursorX] = ch;
+        ++cursorX;
+        ++i;
+
+        if ((ch = fgetc(stream)) == EOF)
+          break;
+      }
+      if (ch == EOF)
+        break;
+
+      if (nInserted > 0) {
+        memmove(&str[cursorX], &str[cursorX - nInserted], insertBuf[LINE_SIZE]);
+        strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
+        insertBuf[0] = nInserted = 0;
+      }
+      ungetc(ch, stream);
+      continue;
     }
     if (ch == 8 || ch == 127) { // Backspace or Delete
       while (ch == 8 || ch == 127) {
@@ -1408,23 +1434,6 @@ char *readLine(char *str, int size, FILE *stream)
       }
       if (cursorX > 0)
         ungetc(ch, stream);
-      continue;
-    }
-    if (ch >= 32) { // printable characters
-      putchar(ch);
-      if (cursorX < i) {
-        if (nInserted == 0) {
-          insertBuf[LINE_SIZE] = i - cursorX;
-          str[i] = 0;
-        }
-        printf("\e7%s\e8", &str[cursorX - nInserted]);
-        insertBuf[nInserted] = ch;
-        ++nInserted;
-      }
-      else
-        str[cursorX] = ch;
-      ++cursorX;
-      ++i;
       continue;
     }
 
