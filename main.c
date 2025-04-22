@@ -1230,10 +1230,10 @@ char *readLine(char *str, int size, FILE *stream)
         ++cursorX;
         ++i;
 
-        if ((ch = fgetc(stream)) == EOF)
+        if ((i >= end) || ((ch = fgetc(stream)) == EOF))
           break;
       }
-      if (ch == EOF)
+      if (i >= end || ch == EOF)
         break;
 
       if (nInserted > 0) {
