@@ -10,6 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
+#if defined(__APPLE__) || defined(__linux__)
+#include <unistd.h>
+#include <termios.h>
+#endif
 
 typedef unsigned char *String;
 
@@ -201,6 +206,303 @@ String removeTrailingSemicolon(String str, size_t len)
   return rv;
 }
 
+#if defined(__APPLE__) || defined(__linux__)
+struct termios initial_term;
+
+void loadHistory();
+
+void initTerm()
+{
+  tcgetattr(0, &initial_term);
+  loadHistory();
+}
+
+void saveHistory();
+
+void destroyTerm()
+{
+  saveHistory();
+}
+
+inline static void setNonCanonicalMode()
+{
+  struct termios new_term;
+  new_term = initial_term;
+  new_term.c_oflag |= ONOCR;
+  new_term.c_lflag &= ~(ICANON | ECHO);
+  new_term.c_cc[VMIN] = 1;
+  new_term.c_cc[VTIME] = 0;
+  tcsetattr(0, TCSANOW, &new_term);
+}
+
+inline static void setCanonicalMode()
+{
+  tcsetattr(0, TCSANOW, &initial_term);
+}
+
+int cursorX;
+
+inline static void eraseLine()
+{
+  printf("\e[2K\r");
+  cursorX = 0;
+}
+
+inline static void eraseAll()
+{
+  printf("\e[2J\e[H");
+  cursorX = 0;
+}
+#else
+void initTerm() {}
+void destroyTerm() {}
+#endif
+
+#define LINE_SIZE 100
+#if defined(__APPLE__) || defined(__linux__)
+#define HISTORY_SIZE 100
+
+typedef struct { char str[LINE_SIZE]; int len; } Command;
+
+typedef struct {
+  Command buf[HISTORY_SIZE];
+  int head, tail, count, pos;
+} CmdHistory;
+
+CmdHistory cmdHist;
+
+void setHistory(char *cmd, int len)
+{
+  if (len == 0)
+    return;
+
+  strncpy((char *) &cmdHist.buf[cmdHist.tail].str, cmd, len);
+  cmdHist.buf[cmdHist.tail].str[len] = 0;
+  cmdHist.buf[cmdHist.tail].len = len;
+  if (cmdHist.count < HISTORY_SIZE)
+    ++cmdHist.count;
+  else
+    cmdHist.head = (cmdHist.head + 1) % HISTORY_SIZE;
+  cmdHist.tail = (cmdHist.tail + 1) % HISTORY_SIZE;
+}
+
+enum { Prev, Next };
+
+void showHistory(int dir, char *buf)
+{
+  if (cmdHist.count == 0)
+    return;
+
+  if (dir == Prev && cmdHist.pos < cmdHist.count)
+    ++cmdHist.pos;
+  else if (dir == Prev && cmdHist.pos >= cmdHist.count)
+    cmdHist.pos = cmdHist.count;
+  else if (dir == Next && cmdHist.pos > 1)
+    --cmdHist.pos;
+  else if (dir == Next && cmdHist.pos <= 1) {
+    cmdHist.pos = 0;
+    return;
+  }
+
+  int i = (cmdHist.head + cmdHist.count - cmdHist.pos) % cmdHist.count;
+  Command *cmd = &cmdHist.buf[i];
+  printf("%s", cmd->str);
+  strncpy(buf, cmd->str, cmd->len + 1);
+  cursorX = cmd->len;
+}
+
+void saveHistory()
+{
+  FILE *fp;
+  if (cmdHist.count == 0 || (fp = fopen(".haribote_history", "wt")) == NULL)
+    return;
+
+  int counter = cmdHist.count;
+  while (counter > 0) {
+    int i = (cmdHist.head + cmdHist.count - counter) % cmdHist.count;
+    fprintf(fp, "%s\n", cmdHist.buf[i].str);
+    --counter;
+  }
+
+  fclose(fp);
+}
+
+void loadHistory()
+{
+  FILE *fp;
+  if ((fp = fopen(".haribote_history", "rt")) == NULL)
+    return;
+
+  for (int i = 0; i < HISTORY_SIZE; ++i) {
+    char line[LINE_SIZE];
+    if (fgets(line, LINE_SIZE, fp) == NULL)
+      break;
+    setHistory(line, strlen(line) - 1);
+  }
+
+  fclose(fp);
+}
+
+char *readLine(char *str, int size, FILE *stream)
+{
+  assert(size > 0);
+  setNonCanonicalMode();
+
+  int i = cursorX ? cursorX : 0, end = size - 1, ch, nDeleted = 0, nInserted = 0;
+  char insertBuf[LINE_SIZE + 1] = "";
+
+  while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
+    if (ch == 4) // Control-D
+      break;
+
+    if (ch >= 32 && ch != 127) { // printable characters
+      while (ch >= 32 && ch != 127) {
+        putchar(ch);
+        if (cursorX < i) {
+          if (nInserted == 0)
+            insertBuf[LINE_SIZE] = i - cursorX;
+          printf("\e7%s\e8", &str[cursorX - nInserted]);
+          insertBuf[nInserted] = ch;
+          ++nInserted;
+        }
+        else
+          str[cursorX] = ch;
+        ++cursorX;
+        ++i;
+
+        if ((i >= end) || ((ch = fgetc(stream)) == EOF))
+          break;
+      }
+      if (i >= end || ch == EOF)
+        break;
+
+      if (nInserted > 0) {
+        memmove(&str[cursorX], &str[cursorX - nInserted], insertBuf[LINE_SIZE]);
+        strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
+        insertBuf[0] = nInserted = 0;
+      }
+      str[i] = 0;
+    }
+
+    if (ch == '\n') {
+      putchar(ch);
+      str[i] = ch; str[i + 1] = 0;
+      setHistory(str, i);
+      cmdHist.pos = 0;
+      cursorX = 0;
+      setCanonicalMode();
+      return str;
+    }
+    else if (ch == 8 || ch == 127) { // Backspace or Delete
+      while (ch == 8 || ch == 127) {
+        if (cursorX == 0)
+          break;
+
+        write(1, "\e[D\e[K", 6);
+        if (cursorX < i)
+          printf("\e7%s\e8", &str[cursorX + nDeleted]);
+        --cursorX;
+        ++nDeleted;
+
+        if ((ch = fgetc(stream)) == EOF)
+          break;
+      }
+      if (ch == EOF)
+        break;
+
+      if (nDeleted > 0) {
+        memmove(&str[cursorX], &str[cursorX + nDeleted], i - cursorX - nDeleted);
+        i -= nDeleted;
+        str[i] = nDeleted = 0;
+      }
+      if (cursorX == 0 && (ch == 8 || ch == 127))
+        ;
+      else
+        ungetc(ch, stream);
+    }
+    else if (ch == 27) { // ESC (begining of escape sequence)
+      if ((ch = fgetc(stream)) == EOF)
+        break;
+      else if (ch != 91) { // [
+        ungetc(ch, stream);
+        continue;
+      }
+      if ((ch = fgetc(stream)) == EOF)
+        break;
+      if (ch == 51) { // Forward Delete
+        if ((ch = fgetc(stream)) == EOF || ch != 126) // ~
+          break;
+        if (cursorX == i)
+          continue;
+        // Implement if needed
+        continue;
+      }
+      switch (ch) {
+      case 67: if (cursorX < i) { write(1, "\e[C", 3); ++cursorX; } continue; // RightArrow
+      case 68: if (cursorX > 0) { write(1, "\e[D", 3); --cursorX; } continue; // LeftArrow
+      case 65: strncpy(str, "__PREV_HIST", 12); break; // UpArrow
+      case 66: strncpy(str, "__NEXT_HIST", 12); break; // DownArrow
+      }
+      setCanonicalMode();
+      return str;
+    }
+    else if (ch == 6) { // Control-F
+      if (cursorX < i) {
+        write(1, "\e[C", 3);
+        ++cursorX;
+      }
+    }
+    else if (ch == 2) { // Control-B
+      if (cursorX > 0) {
+        write(1, "\e[D", 3);
+        --cursorX;
+      }
+    }
+    else if (ch == 1) { // Control-A
+      if (cursorX <= 0)
+        continue;
+      printf("\e[%dD", cursorX);
+      cursorX = 0;
+    }
+    else if (ch == 5) { // Control-E
+      if (cursorX >= i)
+        continue;
+      printf("\e[%dC", i - cursorX);
+      cursorX = i;
+    }
+    else if (ch == 21) { // Control-U
+      if (cursorX <= 0)
+        continue;
+      printf("\e[%dD\e[K\e7%s\e8", cursorX, &str[cursorX]);
+      memmove(str, &str[cursorX], i - cursorX);
+      i -= cursorX;
+      str[i] = 0;
+      cursorX = 0;
+    }
+    else if (ch == 11) { // Control-K
+      write(1, "\e[K", 3);
+      str[cursorX] = 0;
+      i -= i - cursorX;
+    }
+    else if (ch == 12) { // Control-L
+      strncpy(str, "clear", 6);
+      setCanonicalMode();
+      return str;
+    }
+  }
+  if (nInserted > 0) {
+    memmove(&str[cursorX], &str[cursorX - nInserted], insertBuf[LINE_SIZE]);
+    strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
+  }
+  str[i] = 0;
+  cursorX = 0;
+  setCanonicalMode();
+  return NULL;
+}
+#else
+#define readLine fgets
+#endif
+
 int main(int argc, const char **argv)
 {
   unsigned char text[10000];
@@ -211,25 +513,56 @@ int main(int argc, const char **argv)
     exit(0);
   }
 
-  for (int nLines = 1;; ++nLines) {
-    printf("[%d]> ", nLines);
-    fgets(text, 10000, stdin);
+  int status = 0;
+  initTerm();
+  for (int next = 1, nLines = 0;;) {
+    if (next)
+      printf("[%d]> ", ++nLines);
+    if (readLine(text, LINE_SIZE, stdin) == NULL) {
+      printf("\n");
+      goto exit;
+    }
     int inputLen = strlen(text);
     if (text[inputLen - 1] == '\n')
-      text[inputLen - 1] = 0;
+      text[--inputLen] = 0;
 
-    String semicolonPos = removeTrailingSemicolon(text, inputLen - 1);
+    next = 1;
+    String semicolonPos = removeTrailingSemicolon(text, inputLen);
     if (strcmp(text, "exit") == 0)
-      exit(0);
+      goto exit;
+#if defined(__APPLE__) || defined(__linux__)
+    else if (strcmp(text, "__PREV_HIST") == 0) {
+      eraseLine();
+      printf("[%d]> ", nLines);
+      showHistory(Prev, text);
+      next = 0;
+    }
+    else if (strcmp(text, "__NEXT_HIST") == 0) {
+      eraseLine();
+      printf("[%d]> ", nLines);
+      showHistory(Next, text);
+      next = 0;
+    }
+#endif
     else if (strncmp(text, "run ", 4) == 0) {
       if (loadText(&text[4], text, 10000) != 0)
         continue;
       run(text);
     }
+#if defined(__APPLE__) || defined(__linux__)
+    else if (strcmp(text, "clear") == 0) {
+      eraseAll();
+      printf("[%d]> ", nLines);
+      next = 0;
+    }
+#endif
     else {
       if (semicolonPos)
         *semicolonPos = ';';
       run(text);
     }
   }
+exit:
+  destroyTerm();
+  exit(status);
 }
