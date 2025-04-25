@@ -359,10 +359,8 @@ char *readLine(char *str, int size, FILE *stream)
       while (ch >= 32 && ch != 127) {
         putchar(ch);
         if (cursorX < i) {
-          if (nInserted == 0) {
+          if (nInserted == 0)
             insertBuf[LINE_SIZE] = i - cursorX;
-            str[i] = 0;
-          }
           printf("\e7%s\e8", &str[cursorX - nInserted]);
           insertBuf[nInserted] = ch;
           ++nInserted;
@@ -383,6 +381,7 @@ char *readLine(char *str, int size, FILE *stream)
         strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
         insertBuf[0] = nInserted = 0;
       }
+      str[i] = 0;
     }
 
     if (ch == '\n') {
@@ -400,10 +399,8 @@ char *readLine(char *str, int size, FILE *stream)
           break;
 
         write(1, "\e[D\e[K", 6);
-        if (cursorX < i) {
-          str[i] = 0;
+        if (cursorX < i)
           printf("\e7%s\e8", &str[cursorX + nDeleted]);
-        }
         --cursorX;
         ++nDeleted;
 
@@ -476,10 +473,10 @@ char *readLine(char *str, int size, FILE *stream)
     else if (ch == 21) { // Control-U
       if (cursorX <= 0)
         continue;
-      str[i] = 0;
       printf("\e[%dD\e[K\e7%s\e8", cursorX, &str[cursorX]);
       memmove(str, &str[cursorX], i - cursorX);
       i -= cursorX;
+      str[i] = 0;
       cursorX = 0;
     }
     else if (ch == 11) { // Control-K
