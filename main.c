@@ -1241,6 +1241,7 @@ char *readLine(char *str, int size, FILE *stream)
         strncpy(&str[cursorX - nInserted], insertBuf, nInserted);
         insertBuf[0] = nInserted = 0;
       }
+      str[i] = 0;
     }
 
     if (ch == '\n') {
@@ -1259,7 +1260,8 @@ char *readLine(char *str, int size, FILE *stream)
 
         write(1, "\e[D\e[K", 6);
         if (cursorX < i) {
-          str[i] = 0;
+          if (nDeleted == 0)
+            str[i] = 0;
           printf("\e7%s\e8", &str[cursorX + nDeleted]);
         }
         --cursorX;
