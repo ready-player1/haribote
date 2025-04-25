@@ -1445,19 +1445,17 @@ char *readLine(char *str, int size, FILE *stream)
       else
         ungetc(ch, stream);
     }
-    else if (ch == 27) { // escape sequence
+    else if (ch == 27) { // ESC (begining of escape sequence)
       if ((ch = fgetc(stream)) == EOF)
         break;
-      else if (ch != 91) {
+      else if (ch != 91) { // [
         ungetc(ch, stream);
         continue;
       }
       if ((ch = fgetc(stream)) == EOF)
         break;
       if (ch == 51) { // Forward Delete
-        if ((ch = fgetc(stream)) == EOF)
-          break;
-        else if (ch != 126) // ~
+        if ((ch = fgetc(stream)) == EOF || ch != 126) // ~
           break;
         if (cursorX == i)
           continue;
