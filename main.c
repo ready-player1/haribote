@@ -1210,9 +1210,6 @@ char *readLine(char *str, int size, FILE *stream)
   char insertBuf[LINE_SIZE + 1] = "";
 
   while ((i < end) && ((ch = fgetc(stream)) != EOF)) {
-    if (ch == 4) // Control-D
-      break;
-
     if (ch >= 32 && ch != 127) { // printable characters
       while (ch >= 32 && ch != 127) {
         putchar(ch);
@@ -1241,6 +1238,9 @@ char *readLine(char *str, int size, FILE *stream)
       }
       str[i] = 0;
     }
+
+    if (ch == 4) // Control-D
+      break;
 
     if (ch == '\n') {
       putchar(ch);
