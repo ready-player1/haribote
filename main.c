@@ -116,77 +116,174 @@ int lexer(String str, int *tc)
   }
 }
 
-int tc[10000]; // トークンコードを格納する
+int tc[10000]; // トークンコード列を格納する
+
+enum {
+  Wildcard,
+
+  Zero,
+  One,
+  Two,
+  Three,
+  Four,
+  Five,
+  Six,
+  Seven,
+  Eight,
+  Nine,
+
+  Equal,
+  NotEq,
+  LesEq,
+  GtrEq,
+  Les,
+  Gtr,
+  Plus,
+  Minus,
+  Assign,
+
+  Lparen,
+  Rparen,
+  Period,
+  Semicolon,
+  Colon,
+
+  Print,
+  Time,
+  Goto,
+  If,
+
+  EndOfKeys
+};
+
+String defaultTokens[] = {
+  "!!*",
+
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+
+  "==",
+  "!=",
+  "<=",
+  ">=",
+  "<",
+  ">",
+  "+",
+  "-",
+  "=",
+
+  "(",
+  ")",
+  ".",
+  ";",
+  ":",
+
+  "print",
+  "time",
+  "goto",
+  "if",
+};
+
+void initTc(String *defaultTokens, int len)
+{
+  assert(len == EndOfKeys);
+  for (int i = 0; i < len; ++i)
+    tc[i] = getTokenCode(defaultTokens[i], strlen(defaultTokens[i]));
+}
+
+#define MAX_PHRASE_LEN 31
+int phraseTc[(MAX_PHRASE_LEN + 1) * 100]; // フレーズを字句解析して得たトークンコード列を格納する
+int wpc[10]; // ワイルドカードにマッチしたトークンを指す
+int nextPc; // マッチしたフレーズの末尾の次のトークンを指す
+
+int match(int id, String phrase, int pc)
+{
+  int head = id * (MAX_PHRASE_LEN + 1), phraseLen;
+
+  if (phraseTc[head + MAX_PHRASE_LEN] == 0) {
+    phraseLen = lexer(phrase, &phraseTc[head]);
+    assert(phraseLen <= MAX_PHRASE_LEN);
+    phraseTc[head + MAX_PHRASE_LEN] = phraseLen;
+  }
+
+  phraseLen = phraseTc[head + MAX_PHRASE_LEN];
+  for (int pos = 0; pos < phraseLen; ++pos) {
+    if (phraseTc[head + pos] == Wildcard) {
+      ++pos;
+      int num = phraseTc[head + pos] - Zero;
+      wpc[num] = pc;
+      ++pc;
+      continue;
+    }
+    if (phraseTc[head + pos] != tc[pc])
+      return 0;
+    ++pc;
+  }
+  nextPc = pc;
+  return 1;
+}
 
 int run(String src)
 {
   clock_t begin = clock();
 
-  int equal     = getTokenCode("==", 2);
-  int notEq     = getTokenCode("!=", 2);
-  int lesEq     = getTokenCode("<=", 2);
-  int gtrEq     = getTokenCode(">=", 2);
-  int les       = getTokenCode("<", 1);
-  int gtr       = getTokenCode(">", 1);
-  int lparen    = getTokenCode("(", 1);
-  int rparen    = getTokenCode(")", 1);
-  int plus      = getTokenCode("+", 1);
-  int minus     = getTokenCode("-", 1);
-  int period    = getTokenCode(".", 1);
-  int semicolon = getTokenCode(";", 1);
-  int colon     = getTokenCode(":", 1);
-  int assign    = getTokenCode("=", 1);
-  int print     = getTokenCode("print", 5);
-  int time      = getTokenCode("time", 4);
-  int _goto     = getTokenCode("goto", 4);
-  int _if       = getTokenCode("if", 2);
-
   int nTokens = lexer(src, tc);
-  tc[nTokens++] = semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
-  tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = period; // エラー表示用
+  tc[nTokens++] = Semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
+  tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = Period; // エラー表示用
 
   int pc;
   for (pc = 0; pc < nTokens; ++pc) { // ラベル定義命令を探して位置を登録
-    if (tc[pc + 1] == colon)
-      vars[tc[pc]] = pc + 2; // ラベル定義命令の次のpc値を変数に記憶させておく
+    if (match(4, "!!*0:", pc))
+      vars[tc[pc]] = nextPc; // ラベル定義命令の次のpc値を変数に記憶させておく
   }
   for (pc = 0; pc < nTokens;) {
-    if (tc[pc + 1] == assign && tc[pc + 3] == semicolon)
-      vars[tc[pc]] = vars[tc[pc + 2]];
-    else if (tc[pc + 1] == assign && tc[pc + 3] == plus && tc[pc + 5] == semicolon)
-      vars[tc[pc]] = vars[tc[pc + 2]] + vars[tc[pc + 4]];
-    else if (tc[pc + 1] == assign && tc[pc + 3] == minus && tc[pc + 5] == semicolon)
-      vars[tc[pc]] = vars[tc[pc + 2]] - vars[tc[pc + 4]];
-    else if (tc[pc] == print && tc[pc + 2] == semicolon)
-      printf("%d\n", vars[tc[pc + 1]]);
-    else if (tc[pc + 1] == colon) { // ラベル定義命令
-      pc += 2; // 読み飛ばす
-      continue;
+    if (match(0, "!!*0 = !!*1;", pc)) {
+      vars[tc[wpc[0]]] = vars[tc[wpc[1]]];
     }
-    else if (tc[pc] == _goto && tc[pc + 2] == semicolon) {
-      pc = vars[tc[pc + 1]];
-      continue;
+    else if (match(1, "!!*0 = !!*1 + !!*2;", pc)) {
+      vars[tc[wpc[0]]] = vars[tc[wpc[1]]] + vars[tc[wpc[2]]];
     }
-    else if (tc[pc] == _if && tc[pc + 1] == lparen && tc[pc + 5] == rparen && tc[pc + 6] == _goto && tc[pc + 8] == semicolon) {
-      int lhs = vars[tc[pc + 2]], op = tc[pc + 3], rhs = vars[tc[pc + 4]];
-      int dest = vars[tc[pc + 7]];
-      if (op == equal && lhs == rhs) { pc = dest; continue; }
-      if (op == notEq && lhs != rhs) { pc = dest; continue; }
-      if (op == lesEq && lhs <= rhs) { pc = dest; continue; }
-      if (op == gtrEq && lhs >= rhs) { pc = dest; continue; }
-      if (op == les   && lhs <  rhs) { pc = dest; continue; }
-      if (op == gtr   && lhs >  rhs) { pc = dest; continue; }
+    else if (match(2, "!!*0 = !!*1 - !!*2;", pc)) {
+      vars[tc[wpc[0]]] = vars[tc[wpc[1]]] - vars[tc[wpc[2]]];
     }
-    else if (tc[pc] == time && tc[pc + 1] == semicolon)
-      printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
-    else if (tc[pc] == semicolon)
+    else if (match(3, "print !!*0;", pc)) {
+      printf("%d\n", vars[tc[wpc[0]]]);
+    }
+    else if (match(4, "!!*0:", pc)) { // ラベル定義命令
       ;
-    else
+    }
+    else if (match(5, "goto !!*0;", pc)) {
+      pc = vars[tc[wpc[0]]];
+      continue;
+    }
+    else if (match(6, "if (!!*0 !!*1 !!*2) goto !!*3;", pc) && Equal <= tc[wpc[1]] && tc[wpc[1]] <= Gtr) {
+      int lhs = vars[tc[wpc[0]]], op = tc[wpc[1]], rhs = vars[tc[wpc[2]]];
+      int dest = vars[tc[wpc[3]]];
+      if (op == Equal && lhs == rhs) { pc = dest; continue; }
+      if (op == NotEq && lhs != rhs) { pc = dest; continue; }
+      if (op == LesEq && lhs <= rhs) { pc = dest; continue; }
+      if (op == GtrEq && lhs >= rhs) { pc = dest; continue; }
+      if (op == Les   && lhs <  rhs) { pc = dest; continue; }
+      if (op == Gtr   && lhs >  rhs) { pc = dest; continue; }
+    }
+    else if (match(7, "time;", pc)) {
+      printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
+    }
+    else if (match(8, ";", pc)) {
+      ;
+    }
+    else {
       goto err;
-
-    while (tc[pc] != semicolon)
-      ++pc;
-    ++pc; // セミコロンを読み飛ばす
+    }
+    pc = nextPc;
   }
   return 0;
 err:
@@ -506,6 +603,7 @@ char *readLine(char *str, int size, FILE *stream)
 int main(int argc, const char **argv)
 {
   unsigned char text[10000];
+  initTc(defaultTokens, sizeof defaultTokens / sizeof defaultTokens[0]);
   if (argc >= 2) {
     if (loadText((String) argv[1], text, 10000) != 0)
       exit(1);
