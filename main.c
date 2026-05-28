@@ -119,7 +119,41 @@ int lexer(String str, int *tc)
 int tc[10000]; // トークンコード列を格納する
 
 enum {
+  PlusPlus,
+  Equal,
+  NotEq,
+  LesEq,
+  GtrEq,
+  Les,
+  Gtr,
+  Plus,
+  Minus,
+  Multi,
+  Divi,
+  Mod,
+  And,
+  ShiftRight,
+  Assign,
+
+  Lparen,
+  Rparen,
+  Lbracket,
+  Rbracket,
+  Lbrace,
+  Rbrace,
+  Period,
+  Comma,
+  Semicolon,
+  Colon,
+
+  Print,
+  Time,
+  Goto,
+  If,
+
   Wildcard,
+  Expr,
+  Expr0,
 
   Zero,
   One,
@@ -132,32 +166,56 @@ enum {
   Eight,
   Nine,
 
-  Equal,
-  NotEq,
-  LesEq,
-  GtrEq,
-  Les,
-  Gtr,
-  Plus,
-  Minus,
-  Assign,
-
-  Lparen,
-  Rparen,
-  Period,
-  Semicolon,
-  Colon,
-
-  Print,
-  Time,
-  Goto,
-  If,
+  Tmp0,
+  Tmp1,
+  Tmp2,
+  Tmp3,
+  Tmp4,
+  Tmp5,
+  Tmp6,
+  Tmp7,
+  Tmp8,
+  Tmp9,
 
   EndOfKeys
 };
 
 String defaultTokens[] = {
+  "++",
+  "==",
+  "!=",
+  "<=",
+  ">=",
+  "<",
+  ">",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "&",
+  ">>",
+  "=",
+
+  "(",
+  ")",
+  "[",
+  "]",
+  "{",
+  "}",
+  ".",
+  ",",
+  ";",
+  ":",
+
+  "print",
+  "time",
+  "goto",
+  "if",
+
   "!!*",
+  "!!**",
+  "!!***",
 
   "0",
   "1",
@@ -170,26 +228,16 @@ String defaultTokens[] = {
   "8",
   "9",
 
-  "==",
-  "!=",
-  "<=",
-  ">=",
-  "<",
-  ">",
-  "+",
-  "-",
-  "=",
-
-  "(",
-  ")",
-  ".",
-  ";",
-  ":",
-
-  "print",
-  "time",
-  "goto",
-  "if",
+  "_t0",
+  "_t1",
+  "_t2",
+  "_t3",
+  "_t4",
+  "_t5",
+  "_t6",
+  "_t7",
+  "_t8",
+  "_t9",
 };
 
 void initTc(String *defaultTokens, int len)
@@ -199,10 +247,65 @@ void initTc(String *defaultTokens, int len)
     tc[i] = getTokenCode(defaultTokens[i], strlen(defaultTokens[i]));
 }
 
+typedef enum {
+  Prefix_PlusPlus = 2,
+  Prefix_Minus = 2,
+  Infix_Multi = 4,
+  Infix_Divi = 4,
+  Infix_Mod = 4,
+  Infix_Plus = 5,
+  Infix_Minus = 5,
+  Infix_ShiftRight = 6,
+  Infix_LesEq = 7,
+  Infix_GtrEq = 7,
+  Infix_Les = 7,
+  Infix_Gtr = 7,
+  Infix_Equal = 8,
+  Infix_NotEq = 8,
+  Infix_And = 9,
+  Infix_Assign = 15,
+  LowestPrecedence = 99,
+  NoPrecedence = 100
+} Precedence;
+
+Precedence precedenceTable[][2] = {
+  [PlusPlus]   = {NoPrecedence,     Prefix_PlusPlus},
+  [Equal]      = {Infix_Equal,      NoPrecedence},
+  [NotEq]      = {Infix_NotEq,      NoPrecedence},
+  [LesEq]      = {Infix_LesEq,      NoPrecedence},
+  [GtrEq]      = {Infix_GtrEq,      NoPrecedence},
+  [Les]        = {Infix_Les,        NoPrecedence},
+  [Gtr]        = {Infix_Gtr,        NoPrecedence},
+  [Plus]       = {Infix_Plus,       NoPrecedence},
+  [Minus]      = {Infix_Minus,      Prefix_Minus},
+  [Multi]      = {Infix_Multi,      NoPrecedence},
+  [Divi]       = {Infix_Divi,       NoPrecedence},
+  [Mod]        = {Infix_Mod,        NoPrecedence},
+  [And]        = {Infix_And,        NoPrecedence},
+  [ShiftRight] = {Infix_ShiftRight, NoPrecedence},
+  [Assign]     = {Infix_Assign,     NoPrecedence},
+};
+
+enum { Infix, Prefix, EndOfStyles };
+
+inline static Precedence getPrecedence(int style, int operator)
+{
+  assert(0 <= style && style < EndOfStyles);
+  return 0 <= operator && operator < Lparen
+    ? precedenceTable[operator][style]
+    : NoPrecedence;
+}
+
 #define MAX_PHRASE_LEN 31
+#define N_WILDCARDS 10
 int phraseTc[(MAX_PHRASE_LEN + 1) * 100]; // フレーズを字句解析して得たトークンコード列を格納する
-int wpc[10]; // ワイルドカードにマッチしたトークンを指す
+int wpc[N_WILDCARDS * 2]; // ワイルドカードにマッチしたトークンを指す
 int nextPc; // マッチしたフレーズの末尾の次のトークンを指す
+
+inline static int _end(int num)
+{
+  return N_WILDCARDS + num;
+}
 
 int match(int id, String phrase, int pc)
 {
@@ -216,14 +319,38 @@ int match(int id, String phrase, int pc)
 
   phraseLen = phraseTc[head + MAX_PHRASE_LEN];
   for (int pos = 0; pos < phraseLen; ++pos) {
-    if (phraseTc[head + pos] == Wildcard) {
+    int phraTc = phraseTc[head + pos];
+    if (phraTc == Wildcard || phraTc == Expr || phraTc == Expr0) {
       ++pos;
       int num = phraseTc[head + pos] - Zero;
-      wpc[num] = pc;
-      ++pc;
+      wpc[num] = pc; // トークンの位置（式の場合は式の開始位置）
+      if (phraTc == Wildcard) {
+        ++pc;
+        continue;
+      }
+      int depth = 0; // 括弧の深さ
+      for (;;) {
+        if (tc[pc] == Semicolon)
+          break;
+        if (tc[pc] == Comma && depth == 0)
+          break;
+
+        if (tc[pc] == Lparen || tc[pc] == Lbracket)
+          ++depth;
+        if (tc[pc] == Rparen || tc[pc] == Rbracket)
+          --depth;
+        if (depth < 0)
+          break;
+        ++pc;
+      }
+      wpc[_end(num)] = pc; // 式の終了位置
+      if (phraTc == Expr && wpc[num] == pc)
+        return 0;
+      if (depth > 0)
+        return 0;
       continue;
     }
-    if (phraseTc[head + pos] != tc[pc])
+    if (phraTc != tc[pc])
       return 0;
     ++pc;
   }
@@ -239,9 +366,21 @@ IntPtr *icp;
 typedef enum {
   OpEnd,
   OpCpy,
+  OpCeq,
+  OpCne,
+  OpCle,
+  OpCge,
+  OpClt,
+  OpCgt,
   OpAdd,
   OpSub,
-  OpPrint,
+  OpMul,
+  OpDiv,
+  OpMod,
+  OpBand,
+  OpShr,
+  OpAdd1,
+  OpNeg,
   OpGoto,
   OpJeq,
   OpJne,
@@ -250,8 +389,8 @@ typedef enum {
   OpJlt,
   OpJgt,
   OpLop,
+  OpPrint,
   OpTime,
-  OpAdd1,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -264,6 +403,148 @@ void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
   icp += 5;
 }
 
+#define N_TMPS 10
+char tmpFlags[N_TMPS];
+
+int tmpAlloc()
+{
+  for (int i = 0; i < N_TMPS; ++i) {
+    if (!tmpFlags[i]) {
+      tmpFlags[i] = 1;
+      return Tmp0 + i;
+    }
+  }
+  printf("Register allocation failed\n");
+  return -1;
+}
+
+void tmpFree(int i)
+{
+  if (Tmp0 <= i && i <= Tmp9)
+    tmpFlags[i - Tmp0] = 0;
+}
+
+int epc, epcEnd; // expression()のためのpc, その式の直後のトークンを指す
+
+int evalExpression(Precedence precedence);
+int expression(int num);
+
+inline static Opcode getOpcode(int i) // for infix operators
+{
+  assert(Equal <= i && i < Assign);
+  return OpCeq + i - Equal;
+}
+
+int evalInfixExpression(int lhs, Precedence precedence, int op)
+{
+  ++epc;
+  int rhs = evalExpression(precedence);
+  int res = tmpAlloc();
+  putIc(getOpcode(op), &vars[res], &vars[lhs], &vars[rhs], 0);
+  tmpFree(lhs);
+  tmpFree(rhs);
+  if (lhs < 0 || rhs < 0)
+    return -1;
+  return res;
+}
+
+int evalExpression(Precedence precedence)
+{
+  int res = -1, e0 = 0;
+  nextPc = 0;
+
+  if (match(99, "( !!**0 )", epc)) { // 括弧
+    res = expression(0);
+  }
+  else if (tc[epc] == PlusPlus) { // 前置インクリメント
+    ++epc;
+    res = evalExpression(Prefix_PlusPlus);
+    putIc(OpAdd1, &vars[res], 0, 0, 0);
+  }
+  else if (tc[epc] == Minus) { // 単項マイナス
+    ++epc;
+    e0 = evalExpression(Prefix_Minus);
+    res = tmpAlloc();
+    putIc(OpNeg, &vars[res], &vars[e0], 0, 0);
+  }
+  else { // 変数もしくは定数
+    res = tc[epc];
+    ++epc;
+  }
+  if (nextPc > 0)
+    epc = nextPc;
+  for (;;) {
+    tmpFree(e0);
+    if (res < 0 || e0 < 0) // ここまででエラーがあれば、処理を打ち切り
+      return -1;
+    if (epc >= epcEnd)
+      break;
+
+    Precedence encountered; // ぶつかった演算子の優先順位を格納する
+    e0 = 0;
+    if (tc[epc] == PlusPlus) { // 後置インクリメント
+      ++epc;
+      e0 = res;
+      res = tmpAlloc();
+      putIc(OpCpy, &vars[res], &vars[e0], 0, 0);
+      putIc(OpAdd1, &vars[e0], 0, 0, 0);
+    }
+    else if (precedence >= (encountered = getPrecedence(Infix, tc[epc]))) {
+      /*
+        「引数として渡された優先順位」が「ぶつかった演算子の優先順位」よりも
+        低いか又は等しい(値が大きいか又は等しい)ときは、このブロックを実行して
+        中置演算子を評価する。
+
+        「引数として渡された優先順位」が「ぶつかった演算子の優先順位」よりも
+        高い(値が小さい)ときは、このブロックを実行せずにこれまでに式を評価した
+        結果を呼び出し元に返す。
+      */
+      switch (tc[epc]) {
+      case Multi: case Divi: case Mod:
+      case Plus: case Minus:
+      case ShiftRight:
+      case Les: case LesEq: case Gtr: case GtrEq:
+      case Equal: case NotEq:
+      case And:
+        res = evalInfixExpression(res, encountered - 1, tc[epc]);
+        break;
+      case Assign:
+        ++epc;
+        e0 = evalExpression(encountered);
+        putIc(OpCpy, &vars[res], &vars[e0], 0, 0);
+        break;
+      }
+    }
+    else
+      break;
+  }
+  return res;
+}
+
+// 引数として渡したワイルドカード番号にマッチした式をコンパイルしてinternalCodes[]に書き込む
+int expression(int num)
+{
+  if (wpc[num] == wpc[_end(num)])
+    return 0;
+
+  int i, end = N_WILDCARDS * 2, buf[end + 1];
+  for (i = 0; i < end; ++i)
+    buf[i] = wpc[i];
+  buf[i] = nextPc;
+  int oldEpc = epc, oldEpcEnd = epcEnd;
+
+  epc = wpc[num]; epcEnd = wpc[_end(num)];
+  int res = evalExpression(LowestPrecedence);
+  if (epc < epcEnd)
+    return -1;
+
+  for (i = 0; i < end; ++i)
+    wpc[i] = buf[i];
+  nextPc = buf[i];
+  epc = oldEpc; epcEnd = oldEpcEnd;
+  return res;
+}
+
 int compile(String src)
 {
   int nTokens = lexer(src, tc);
@@ -272,8 +553,12 @@ int compile(String src)
 
   icp = internalCodes;
 
+  for (int i = 0; i < N_TMPS; ++i)
+    tmpFlags[i] = 0;
+
   int pc;
   for (pc = 0; pc < nTokens;) {
+    int e0 = 0;
     if (match(0, "!!*0 = !!*1;", pc)) {
       putIc(OpCpy, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], 0, 0);
     }
@@ -289,8 +574,9 @@ int compile(String src)
     else if (match(2, "!!*0 = !!*1 - !!*2;", pc)) {
       putIc(OpSub, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[2]]], 0);
     }
-    else if (match(3, "print !!*0;", pc)) {
-      putIc(OpPrint, &vars[tc[wpc[0]]], 0, 0, 0);
+    else if (match(3, "print !!**0;", pc)) {
+      e0 = expression(0);
+      putIc(OpPrint, &vars[e0], 0, 0, 0);
     }
     else if (match(4, "!!*0:", pc)) { // ラベル定義命令
       vars[tc[wpc[0]]] = icp - internalCodes; // ラベル名の変数にその時のicpの相対位置を入れておく
@@ -304,12 +590,15 @@ int compile(String src)
     else if (match(7, "time;", pc)) {
       putIc(OpTime, 0, 0, 0, 0);
     }
-    else if (match(8, ";", pc)) {
-      ;
+    else if (match(8, "!!***0;", pc)) {
+      e0 = expression(0);
     }
     else {
       goto err;
     }
+    tmpFree(e0);
+    if (e0 < 0)
+      goto err;
     pc = nextPc;
   }
   putIc(OpEnd, 0, 0, 0, 0);
@@ -336,25 +625,27 @@ void exec()
     switch ((Opcode) icp[0]) {
     case OpEnd:
       return;
-    case OpCpy:
-      *icp[1] = *icp[2];
-      icp += 5;
-      continue;
-    case OpAdd:
-      *icp[1] = *icp[2] + *icp[3];
-      icp += 5;
-      continue;
-    case OpSub:
-      *icp[1] = *icp[2] - *icp[3];
-      icp += 5;
-      continue;
+    case OpNeg:   *icp[1] = -*icp[2];           icp += 5; continue;
+    case OpAdd1:  ++(*icp[1]);                  icp += 5; continue;
+    case OpMul:   *icp[1] = *icp[2] *  *icp[3]; icp += 5; continue;
+    case OpDiv:   *icp[1] = *icp[2] /  *icp[3]; icp += 5; continue;
+    case OpMod:   *icp[1] = *icp[2] %  *icp[3]; icp += 5; continue;
+    case OpAdd:   *icp[1] = *icp[2] +  *icp[3]; icp += 5; continue;
+    case OpSub:   *icp[1] = *icp[2] -  *icp[3]; icp += 5; continue;
+    case OpShr:   *icp[1] = *icp[2] >> *icp[3]; icp += 5; continue;
+    case OpClt:   *icp[1] = *icp[2] <  *icp[3]; icp += 5; continue;
+    case OpCle:   *icp[1] = *icp[2] <= *icp[3]; icp += 5; continue;
+    case OpCgt:   *icp[1] = *icp[2] >  *icp[3]; icp += 5; continue;
+    case OpCge:   *icp[1] = *icp[2] >= *icp[3]; icp += 5; continue;
+    case OpCeq:   *icp[1] = *icp[2] == *icp[3]; icp += 5; continue;
+    case OpCne:   *icp[1] = *icp[2] != *icp[3]; icp += 5; continue;
+    case OpBand:  *icp[1] = *icp[2] &  *icp[3]; icp += 5; continue;
+    case OpCpy:   *icp[1] = *icp[2];            icp += 5; continue;
     case OpPrint:
       printf("%d\n", *icp[1]);
       icp += 5;
       continue;
-    case OpGoto:
-      icp = (IntPtr *) icp[1];
-      continue;
+    case OpGoto:                           icp = (IntPtr *) icp[1]; continue;
     case OpJeq:  if (*icp[2] == *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
     case OpJne:  if (*icp[2] != *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
     case OpJle:  if (*icp[2] <= *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
@@ -363,10 +654,6 @@ void exec()
     case OpJgt:  if (*icp[2] >  *icp[3]) { icp = (IntPtr *) icp[1]; continue; } icp += 5; continue;
     case OpTime:
       printf("time: %.3f[sec]\n", (clock() - begin) / (double) CLOCKS_PER_SEC);
-      icp += 5;
-      continue;
-    case OpAdd1:
-      ++(*icp[1]);
       icp += 5;
       continue;
     case OpLop:
