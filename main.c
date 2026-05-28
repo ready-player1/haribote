@@ -8,6 +8,7 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 #include <assert.h>
@@ -46,7 +47,7 @@ int loadText(String path, String text, int size)
 String tokenStrs[MAX_TOKEN_CODE + 1];
 int    tokenLens[MAX_TOKEN_CODE + 1];
 
-int vars[MAX_TOKEN_CODE + 1];
+intptr_t vars[MAX_TOKEN_CODE + 1];
 
 int getTokenCode(String str, int len)
 {
@@ -71,6 +72,16 @@ int getTokenCode(String str, int len)
     ++nTokens;
 
     vars[i] = strtol(tokenStrs[i], NULL, 0); // 定数であれば初期値を設定（定数でなければ0になる）
+    if (tokenStrs[i][0] == '"') {
+      char *p = malloc(len - 1);
+      if (p == NULL) {
+        printf("Failed to allocate memory\n");
+        exit(1);
+      }
+      vars[i] = (intptr_t) p;
+      memcpy(p, tokenStrs[i] + 1, len - 2); // 手抜き実装（エスケープシーケンスを処理していない）
+      p[len - 2] = 0;
+    }
   }
   return i;
 }
@@ -104,6 +115,13 @@ int lexer(String str, int *tc)
     }
     else if (strchr("=+-*/!%&~|<>?:.#", str[pos]) != NULL) {
       while (strchr("=+-*/!%&~|<>?:.#", str[pos + len]) != NULL && str[pos + len] != 0)
+        ++len;
+    }
+    else if (str[pos] == '"') { // 文字列
+      len = 1;
+      while (str[pos + len] != str[pos] && str[pos + len] >= ' ')
+        ++len;
+      if (str[pos + len] == str[pos])
         ++len;
     }
     else {
@@ -154,6 +172,7 @@ enum {
   For,
   Continue,
   Break,
+  Prints,
 
   Wildcard,
   Expr,
@@ -220,6 +239,7 @@ String defaultTokens[] = {
   "for",
   "continue",
   "break",
+  "prints",
 
   "!!*",
   "!!**",
@@ -366,7 +386,7 @@ int match(int id, String phrase, int pc)
   return 1;
 }
 
-typedef int *IntPtr;
+typedef intptr_t *IntPtr;
 
 IntPtr internalCodes[10000]; // ソースコードをコンパイルして生成した内部コードを格納する
 IntPtr *icp;
@@ -399,6 +419,11 @@ typedef enum {
   OpLop,
   OpPrint,
   OpTime,
+  OpPrints,
+  OpAryNew,
+  OpAryInit,
+  OpAryGet,
+  OpArySet,
 } Opcode;
 
 void putIc(Opcode op, IntPtr p1, IntPtr p2, IntPtr p3, IntPtr p4)
@@ -458,7 +483,7 @@ int evalInfixExpression(int lhs, Precedence precedence, int op)
 
 int evalExpression(Precedence precedence)
 {
-  int res = -1, e0 = 0;
+  int res = -1, e0 = 0, e1 = 0;
   nextPc = 0;
 
   if (match(99, "( !!**0 )", epc)) { // 括弧
@@ -483,19 +508,34 @@ int evalExpression(Precedence precedence)
     epc = nextPc;
   for (;;) {
     tmpFree(e0);
-    if (res < 0 || e0 < 0) // ここまででエラーがあれば、処理を打ち切り
+    tmpFree(e1);
+    if (res < 0 || e0 < 0 || e1 < 0) // ここまででエラーがあれば、処理を打ち切り
       return -1;
     if (epc >= epcEnd)
       break;
 
     Precedence encountered; // ぶつかった演算子の優先順位を格納する
-    e0 = 0;
+    e0 = 0, e1 = 0;
     if (tc[epc] == PlusPlus) { // 後置インクリメント
       ++epc;
       e0 = res;
       res = tmpAlloc();
       putIc(OpCpy, &vars[res], &vars[e0], 0, 0);
       putIc(OpAdd1, &vars[e0], 0, 0, 0);
+    }
+    else if (match(70, "[!!**0]=", epc)) {
+      e1 = res;
+      e0 = expression(0);
+      epc = nextPc;
+      res = evalExpression(Infix_Assign);
+      putIc(OpArySet, &vars[e1], &vars[e0], &vars[res], 0);
+    }
+    else if (match(71, "[!!**0]", epc)) {
+      e1 = res;
+      res = tmpAlloc();
+      e0 = expression(0);
+      putIc(OpAryGet, &vars[e1], &vars[e0], &vars[res], 0);
+      epc = nextPc;
     }
     else if (precedence >= (encountered = getPrecedence(Infix, tc[epc]))) {
       /*
@@ -658,11 +698,8 @@ int compile(String src)
     else if (match(9, "!!*0 = !!*1 + 1;", pc) && tc[wpc[0]] == tc[wpc[1]]) { // +1専用の命令
       putIc(OpAdd1, &vars[tc[wpc[0]]], 0, 0, 0);
     }
-    else if (match(1, "!!*0 = !!*1 + !!*2;", pc)) {
-      putIc(OpAdd, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[2]]], 0);
-    }
-    else if (match(2, "!!*0 = !!*1 - !!*2;", pc)) {
-      putIc(OpSub, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[2]]], 0);
+    else if (match(1, "!!*0 = !!*1 !!*2 !!*3;", pc) && Equal <= tc[wpc[2]] && tc[wpc[2]] < Assign) { // 加算、減算など
+      putIc(OpCeq + tc[wpc[2]] - Equal, &vars[tc[wpc[0]]], &vars[tc[wpc[1]]], &vars[tc[wpc[3]]], 0);
     }
     else if (match(3, "print !!**0;", pc)) {
       e0 = expression(0);
@@ -749,6 +786,41 @@ int compile(String src)
     else if (match(18, "if (!!**0) break;", pc) && loopBlock) {
       ifgoto(0, ConditionIsTrue, loopBlock[ForBreak]);
     }
+    else if (match(19, "prints !!**0;", pc)) {
+      e0 = expression(0);
+      putIc(OpPrints, &vars[e0], 0, 0, 0);
+    }
+    else if (match(20, "int !!*0[!!**2];", pc)) {
+      e2 = expression(2);
+      putIc(OpAryNew, &vars[tc[wpc[0]]], &vars[e2], 0, 0);
+    }
+    else if (match(21, "int !!*0[!!**2] = {", pc)) {
+      e2 = expression(2);
+      putIc(OpAryNew, &vars[tc[wpc[0]]], &vars[e2], 0, 0);
+
+      int pc, nElems = 0;
+      for (pc = nextPc; tc[pc] != Rbrace; ++pc) {
+        if (pc >= nTokens)
+          goto err;
+        if (tc[pc] != Comma)
+          ++nElems;
+      }
+      intptr_t *ary = malloc(nElems * sizeof(intptr_t));
+      if (ary == NULL) {
+        printf("Failed to allocate memory\n");
+        exit(1);
+      }
+
+      nElems = 0;
+      for (pc = nextPc; tc[pc] != Rbrace; ++pc) {
+        if (tc[pc] == Comma)
+          continue;
+        ary[nElems] = vars[tc[pc]];
+        ++nElems;
+      }
+      putIc(OpAryInit, &vars[tc[wpc[0]]], (IntPtr) ary, (IntPtr) nElems, 0);
+      nextPc = pc + 2; // } と ; の分
+    }
     else if (match(8, "!!***0;", pc)) {
       e0 = expression(0);
     }
@@ -788,7 +860,7 @@ void exec()
 {
   clock_t begin = clock();
   icp = internalCodes;
-  int i;
+  intptr_t i, *a;
   for (;;) {
     switch ((Opcode) icp[0]) {
     case OpEnd:
@@ -832,6 +904,35 @@ void exec()
         icp = (IntPtr *) icp[1];
         continue;
       }
+      icp += 5;
+      continue;
+    case OpPrints:
+      printf("%s\n", (char *) *icp[1]);
+      icp += 5;
+      continue;
+    case OpAryNew:
+      *icp[1] = (intptr_t) malloc(*icp[2] * sizeof(intptr_t));
+      if (*icp[1] == (intptr_t) NULL) {
+        printf("Failed to allocate memory\n");
+        exit(1);
+      }
+      memset((char *) *icp[1], 0, *icp[2] * sizeof(intptr_t));
+      icp += 5;
+      continue;
+    case OpAryInit:
+      memcpy((char *) *icp[1], (char *) icp[2], ((int) icp[3]) * sizeof(intptr_t));
+      icp += 5;
+      continue;
+    case OpArySet:
+      a = (intptr_t *) *icp[1];
+      i = *icp[2];
+      a[i] = *icp[3];
+      icp += 5;
+      continue;
+    case OpAryGet:
+      a = (intptr_t *) *icp[1];
+      i = *icp[2];
+      *icp[3] = a[i];
       icp += 5;
       continue;
     }
