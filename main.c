@@ -398,7 +398,7 @@ int match(int id, String phrase, int pc)
 
 typedef AInt *IntPtr;
 
-IntPtr internalCodes[10000]; // ソースコードをコンパイルして生成した内部コードを格納する
+IntPtr internalCode[10000]; // ソースコードをコンパイルして生成した内部コードを格納する
 IntPtr *icp;
 
 typedef enum {
@@ -645,7 +645,7 @@ int evalExpression(Precedence precedence)
   return res;
 }
 
-// 引数として渡したワイルドカード番号にマッチした式をコンパイルしてinternalCodes[]に書き込む
+// 引数として渡したワイルドカード番号にマッチした式をコンパイルしてinternalCode[]に書き込む
 int expression(int num)
 {
   if (wpc[num] == wpc[_end(num)])
@@ -803,7 +803,7 @@ int compile(String src)
   tc[nTokens++] = Semicolon; // 末尾に「;」を付け忘れることが多いので、付けてあげる
   tc[nTokens] = tc[nTokens + 1] = tc[nTokens + 2] = tc[nTokens + 3] = Period; // エラー表示用
 
-  icp = internalCodes;
+  icp = internalCode;
 
   for (int i = 0; i < N_TMPS; ++i)
     tmpFlags[i] = 0;
@@ -829,7 +829,7 @@ int compile(String src)
       exprsPutIc(1, OpPrint, 0, &e0);
     }
     else if (match(4, "!!*0:", pc)) { // ラベル定義命令
-      vars[tc[wpc[0]]] = icp - internalCodes; // ラベル名の変数にその時のicpの相対位置を入れておく
+      vars[tc[wpc[0]]] = icp - internalCode; // ラベル名の変数にその時のicpの相対位置を入れておく
     }
     else if (match(5, "goto !!*0;", pc)) {
       putIc(OpGoto, &vars[tc[wpc[0]]], &vars[tc[wpc[0]]], 0, 0);
@@ -850,11 +850,11 @@ int compile(String src)
     else if (match(13, "} else {", pc) && curBlock[BlockType] == IfBlock) {
       curBlock[IfLabel1] = tmpLabelAlloc(); // else節の終端
       putIc(OpGoto, &vars[curBlock[IfLabel1]], &vars[curBlock[IfLabel1]], 0, 0);
-      vars[curBlock[IfLabel0]] = icp - internalCodes;
+      vars[curBlock[IfLabel0]] = icp - internalCode;
     }
     else if (match(12, "}", pc) && curBlock[BlockType] == IfBlock) {
       int ifLabel = curBlock[IfLabel1] ? IfLabel1 : IfLabel0;
-      vars[curBlock[ifLabel]] = icp - internalCodes;
+      vars[curBlock[ifLabel]] = icp - internalCode;
       curBlock = endBlock();
     }
     else if (match(14, "for (!!***0; !!***1; !!***2) {", pc)) { // for文
@@ -870,10 +870,10 @@ int compile(String src)
       if (wpc[1] < wpc[_end(1)])
         ifgoto(1, ConditionIsFalse, curBlock[LoopBreak]);
       saveExpr(2);
-      vars[curBlock[LoopBegin]] = icp - internalCodes;
+      vars[curBlock[LoopBegin]] = icp - internalCode;
     }
     else if (match(12, "}", pc) && curBlock[BlockType] == ForBlock) {
-      vars[curBlock[LoopContinue]] = icp - internalCodes;
+      vars[curBlock[LoopContinue]] = icp - internalCode;
 
       restoreExpr(1);
       restoreExpr(2);
@@ -892,7 +892,7 @@ int compile(String src)
         else
           putIc(OpGoto, &vars[curBlock[LoopBegin]], &vars[curBlock[LoopBegin]], 0, 0);
       }
-      vars[curBlock[LoopBreak]] = icp - internalCodes;
+      vars[curBlock[LoopBreak]] = icp - internalCode;
 
       stopLoop(&loopBlock);
       curBlock = endBlock();
@@ -907,14 +907,14 @@ int compile(String src)
 
       saveExpr(1);
       ifgoto(1, ConditionIsFalse, curBlock[LoopBreak]);
-      vars[curBlock[LoopBegin]] = icp - internalCodes;
+      vars[curBlock[LoopBegin]] = icp - internalCode;
     }
     else if (match(12, "}", pc) && curBlock[BlockType] == WhileBlock) {
-      vars[curBlock[LoopContinue]] = icp - internalCodes;
+      vars[curBlock[LoopContinue]] = icp - internalCode;
 
       restoreExpr(1);
       ifgoto(1, ConditionIsTrue, curBlock[LoopBegin]);
-      vars[curBlock[LoopBreak]] = icp - internalCodes;
+      vars[curBlock[LoopBreak]] = icp - internalCode;
 
       stopLoop(&loopBlock);
       curBlock = endBlock();
@@ -1021,16 +1021,16 @@ int compile(String src)
 
   IntPtr *end = icp, *tmpDest;
   Opcode op;
-  for (icp = internalCodes; icp < end; icp += 5) { // goto先の設定
+  for (icp = internalCode; icp < end; icp += 5) { // goto先の設定
     op = (Opcode) icp[0];
     if (OpGoto <= op && op <= OpLop) {
-      tmpDest = internalCodes + *icp[1];
+      tmpDest = internalCode + *icp[1];
       while ((Opcode) tmpDest[0] == OpGoto) // goto先がOpGotoのときは、さらにその先を読む
-        tmpDest = internalCodes + *tmpDest[2];
+        tmpDest = internalCode + *tmpDest[2];
       icp[1] = (IntPtr) tmpDest;
     }
   }
-  return end - internalCodes;
+  return end - internalCode;
 err:
   printf("Syntax error: %s %s %s %s\n", tokenStrs[tc[pc]], tokenStrs[tc[pc + 1]], tokenStrs[tc[pc + 2]], tokenStrs[tc[pc + 3]]);
   return -1;
@@ -1041,7 +1041,7 @@ AWindow *win;
 void exec()
 {
   clock_t begin = clock();
-  icp = internalCodes;
+  icp = internalCode;
   AInt i, j, *a, sx, sy;
   AInt32 *p32;
   char str[100];
